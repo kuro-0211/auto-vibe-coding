@@ -1,0 +1,33 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# ─── Environment ───
+.env
+.env.local
+
+# ─── Docker ───
+docker-compose.override.yml
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
+
+# ─── Ollama 모델 캐시 ───
+ollama_data/
+
+# ─── 출력물 ───
+output/
+*.log
