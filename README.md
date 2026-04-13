@@ -15,43 +15,17 @@ Hybrid Vibe Coding Engine은 클라우드 LLM과 로컬 LLM의 협업을 통해,
 
 ## 🏗️ 시스템 아키텍처
 
-```
-사용자 (Vibe 입력)
-        │
-        ▼
-┌─────────────────────────────────┐
-│       Streamlit Dashboard       │
-│    (워크플로우 모니터링 UI)       │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────┐
-│      PM Agent (팀장 에이전트)     │
-│  - 의도 해석 및 태스크 분해       │
-│  - 최종 결과물 의도 검증          │
-│  Cloud LLM: GPT-4o / Gemini    │
-└───────┬─────────────┬───────────┘
-        │             │
-        ▼             ▼
-┌──────────────┐ ┌──────────────────┐
-│  Researcher  │ │    Developer     │
-│    Agent     │ │     Agent        │
-│ - 기술 리서치 │ │ - 코드 생성/수정  │
-│ - 문서 검색  │ │ - 테스트 실행     │
-│ Cloud LLM    │ │ Local LLM(Ollama)│
-└──────┬───────┘ └────────┬─────────┘
-       │                  │
-       └────────┬─────────┘
-                ▼
-┌─────────────────────────────────┐
-│   Docker Sandbox (코드 실행)     │
-│   - 격리된 실행 환경             │
-│   - 에러 로그 수집               │
-└────────────────┬────────────────┘
-                 │
-                 ▼
-        Self-Correction Loop
-        (에러 시 재시도)
+```mermaid
+graph TB
+    INPUT["👤 사용자 · Vibe 입력"] --> DASH["📊 Streamlit Dashboard"]
+    DASH --> PM["🎯 PM Agent<br/>의도 해석 · 태스크 분해 · 의도 검증<br/>Cloud LLM: GPT-4o / Gemini"]
+    PM --> RES["🔍 Researcher Agent<br/>기술 리서치 · 문서 검색<br/>Cloud LLM"]
+    PM --> DEV["💻 Developer Agent<br/>코드 생성 · 수정 · 테스트<br/>Local LLM: Ollama"]
+    RES --> DEV
+    DEV --> SANDBOX["🐳 Docker Sandbox<br/>격리된 코드 실행 · 에러 로그 수집"]
+    SANDBOX -->|✅ 성공| PM
+    SANDBOX -->|❌ 실패| LOOP["🔄 Self-Correction Loop"]
+    LOOP --> DEV
 ```
 
 > 상세 아키텍처 다이어그램은 [`architecture.mermaid`](./architecture.mermaid) 파일을 참고하세요.
@@ -88,14 +62,14 @@ Hybrid Vibe Coding Engine은 클라우드 LLM과 로컬 LLM의 협업을 통해,
 
 ## 🔄 Self-Correction Loop
 
-```
-코드 생성 → Docker 실행 → 성공? ──Yes──→ PM 의도 검증 → 완료
-                            │
-                           No
-                            │
-                            ▼
-                   에러 로그 정제 → Developer Agent 재시도
-                   (최대 N회 반복)
+```mermaid
+graph LR
+    A["💻 코드 생성"] --> B["🐳 Docker 실행"]
+    B -->|성공| C["🎯 PM 의도 검증"]
+    C -->|통과| D["✅ 완료"]
+    C -.->|미달| A
+    B -->|실패| E["📋 에러 로그 정제"]
+    E -->|최대 N회 반복| A
 ```
 
 1. Developer Agent가 코드를 생성하여 Docker 샌드박스에서 실행
