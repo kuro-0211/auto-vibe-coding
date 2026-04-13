@@ -5,19 +5,15 @@ graph TB
 
     subgraph UI["🖥️ Streamlit Dashboard"]
         MONITOR["워크플로우 모니터링"]
-        STATUS["에이전트 상태 표시"]
         RESULT["최종 결과물 출력"]
     end
 
     subgraph ORCHESTRATION["🧠 오케스트레이션 레이어"]
-        direction TB
         CREWAI["CrewAI<br/>역할 기반 협업"]
         LANGGRAPH["LangGraph<br/>순환 제어 구조"]
     end
 
     subgraph AGENTS["🤖 멀티 에이전트 시스템"]
-        direction TB
-
         subgraph PM["PM Agent (팀장)"]
             PM_PARSE["의도 해석 &<br/>태스크 분해"]
             PM_VERIFY["의도 검증<br/>(Intent Verification)"]
@@ -47,52 +43,52 @@ graph TB
 
     subgraph SANDBOX["🐳 Docker Sandbox"]
         EXEC["격리된 코드 실행"]
-        LOG["에러 로그 수집"]
-        PARSE["에러 메시지 정제"]
+        ERR["에러 로그 수집 & 정제"]
     end
 
     subgraph CONTEXT["📦 컨텍스트 관리"]
-        COMPRESS["토큰 압축<br/>(TOON 기법)"]
-        SUMMARY["대화 요약<br/>알고리즘"]
+        COMPRESS["토큰 압축 · 대화 요약"]
     end
 
-    %% 메인 플로우
+    %% ── 메인 흐름 (위 → 아래) ──
     INPUT --> MONITOR
     MONITOR --> CREWAI
     CREWAI <--> LANGGRAPH
-
-    %% 에이전트 연결
     CREWAI --> PM_PARSE
+
+    %% ── 에이전트 간 흐름 ──
     PM_PARSE --> RES_SEARCH
-    PM_PARSE --> DEV_CODE
     RES_REFINE --> DEV_CODE
 
-    %% LLM 연결
-    PM_PARSE -.->|기획/설계| GPT4O
-    PM_VERIFY -.->|의도 검증| GPT4O
-    RES_SEARCH -.->|리서치| GEMINI
-    DEV_CODE -.->|코드 생성| QWEN
-    DEV_FIX -.->|코드 수정| LLAMA
+    %% ── Cloud LLM 연결 ──
+    PM -.->|기획 · 설계 · 검증| GPT4O
+    RESEARCH -.->|리서치| GEMINI
+
+    %% ── Local LLM 연결 ──
+    DEV -.->|코드 생성 · 수정| QWEN
+    DEV -.->|코드 수정| LLAMA
     QWEN --> GPU
     LLAMA --> GPU
 
-    %% 실행 플로우
+    %% ── 실행 ──
     DEV_CODE --> EXEC
+
+    %% ── 실행 결과 분기 ──
     EXEC -->|성공| PM_VERIFY
-    EXEC -->|실패| LOG
-    LOG --> PARSE
-    PARSE --> DEV_FIX
-    DEV_FIX --> EXEC
+    EXEC -->|실패| ERR
 
-    %% 의도 검증
+    %% ── Self-Correction (점선) ──
+    ERR -.->|재시도| DEV_FIX
+    DEV_FIX -.-> EXEC
+
+    %% ── 의도 검증 결과 ──
     PM_VERIFY -->|통과| RESULT
-    PM_VERIFY -->|미달| PM_PARSE
+    PM_VERIFY -.->|미달| PM_PARSE
 
-    %% 컨텍스트 관리
-    AGENTS <--> COMPRESS
-    COMPRESS <--> SUMMARY
+    %% ── 컨텍스트 ──
+    AGENTS <-.-> COMPRESS
 
-    %% 스타일
+    %% ── 스타일 ──
     classDef user fill:#4A90D9,stroke:#2E6CB0,color:#fff,stroke-width:2px
     classDef ui fill:#50C878,stroke:#3DA35D,color:#fff,stroke-width:2px
     classDef agent fill:#FFB347,stroke:#E09030,color:#333,stroke-width:2px
@@ -102,9 +98,9 @@ graph TB
     classDef context fill:#95A5A6,stroke:#7F8C8D,color:#fff,stroke-width:2px
 
     class INPUT user
-    class MONITOR,STATUS,RESULT ui
+    class MONITOR,RESULT ui
     class PM_PARSE,PM_VERIFY,RES_SEARCH,RES_REFINE,DEV_CODE,DEV_FIX agent
     class GPT4O,GEMINI cloud
     class QWEN,LLAMA,GPU local
-    class EXEC,LOG,PARSE sandbox
-    class COMPRESS,SUMMARY context
+    class EXEC,ERR sandbox
+    class COMPRESS context
