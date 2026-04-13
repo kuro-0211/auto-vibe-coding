@@ -17,12 +17,12 @@ Hybrid Vibe Coding Engine은 클라우드 LLM과 로컬 LLM의 협업을 통해,
 
 ```mermaid
 graph LR
-    A(Vibe Input):::mint --> B(Streamlit):::blue
+    A(Vibe 입력):::mint --> B(Streamlit):::blue
 
-    subgraph agents [" Agent Pipeline "]
+    subgraph agents [" 에이전트 파이프라인 "]
         direction LR
-        PM(PM Agent):::amber --> RES(Researcher):::violet
-        PM --> DEV(Developer):::green
+        PM(PM 에이전트):::amber --> RES(리서처):::violet
+        PM --> DEV(개발자):::green
         RES --> DEV
     end
 
@@ -32,8 +32,8 @@ graph LR
         LOCAL(Ollama · RTX 3080):::red
     end
 
-    subgraph run [" Execution "]
-        SANDBOX(Docker Sandbox):::slate
+    subgraph run [" 실행 환경 "]
+        SANDBOX(Docker 샌드박스):::slate
     end
 
     B --> PM
@@ -41,9 +41,9 @@ graph LR
     RES -.- CLOUD
     DEV -.- LOCAL
     DEV --> SANDBOX
-    SANDBOX -- success --> PM
-    SANDBOX -. fail .-> DEV
-    PM --> OUT(Output):::mint
+    SANDBOX -- 성공 --> PM
+    SANDBOX -. 실패 .-> DEV
+    PM --> OUT(결과물):::mint
 
     classDef mint fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
     classDef blue fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f
@@ -94,12 +94,12 @@ graph LR
 
 ```mermaid
 graph LR
-    A(Code Gen):::green --> B(Docker Run):::blue
-    B -- success --> C{Intent\nCheck}:::amber
-    C -- pass --> D(Done):::mint
-    C -. retry .-> A
-    B -. fail .-> E(Error\nParsing):::red
-    E -. max N .-> A
+    A(코드 생성):::green --> B(Docker 실행):::blue
+    B -- 성공 --> C{의도 검증}:::amber
+    C -- 통과 --> D(완료):::mint
+    C -. 재작업 .-> A
+    B -. 실패 .-> E(에러 분석):::red
+    E -. 최대 N회 .-> A
 
     classDef green fill:#dcfce7,stroke:#86efac,color:#14532d
     classDef blue fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f

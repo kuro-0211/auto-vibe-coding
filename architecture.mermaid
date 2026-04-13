@@ -1,75 +1,50 @@
 graph LR
-    %% ─── Input ───
-    A(Vibe Input):::mint --> B(Streamlit\n:8501):::blue
+    %% ─── 메인 파이프라인 (좌 → 우 직선 흐름) ───
 
-    %% ─── Orchestration ───
-    subgraph orch [" Orchestration "]
-        direction TB
-        CR(CrewAI):::slate <--> LG(LangGraph):::slate
+    IN(Vibe 입력):::mint
+    UI(Streamlit\n대시보드):::blue
+
+    subgraph orch [" 오케스트레이션 "]
+        CR(CrewAI):::slate
+        LG(LangGraph):::slate
     end
 
-    %% ─── Agent Pipeline ───
-    subgraph agents [" Agent Pipeline "]
-        direction TB
-        PM(PM Agent\nIntent Parse · Verify):::amber
-        RES(Researcher\nTech Search · Refine):::violet
-        DEV(Developer\nCode Gen · Fix):::green
+    subgraph agents [" 에이전트 "]
+        PM(PM 에이전트\n의도 해석 · 검증):::amber
+        RES(리서처\n기술 조사):::violet
+        DEV(개발자\n코드 생성):::green
     end
 
-    %% ─── Cloud LLM ───
-    subgraph cloud [" Cloud LLM "]
-        direction TB
-        GPT(GPT-4o\nSchool API GW):::blue
-        GEM(Gemini 3 Flash\nFree Tier):::blue
+    subgraph exec [" 실행 "]
+        SB(Docker 샌드박스\n격리 실행):::slate
+        ERR(에러 분석):::red
     end
 
-    %% ─── Local LLM ───
-    subgraph local [" Local LLM — Ollama "]
-        direction TB
-        QW(Qwen2.5-Coder):::red
-        LL(Llama 3.3):::red
-        GPU(RTX 3080):::red
-    end
+    OUT(결과물 출력):::mint
 
-    %% ─── Docker Sandbox ───
-    subgraph sandbox [" Docker Sandbox "]
-        direction TB
-        EXEC(Isolated\nExecution):::slate
-        ERR(Error Log\nParse):::slate
-    end
+    %% ─── 클라우드 / 로컬 LLM ───
 
-    %% ─── Context ───
-    subgraph ctx [" Context Mgmt "]
-        COMP(Token\nCompression):::grey
-    end
+    CLOUD(Cloud LLM\nGPT-4o · Gemini):::blue
+    LOCAL(Local LLM\nOllama · RTX 3080):::red
 
-    %% ─── Output ───
-    OUT(Output):::mint
+    %% ─── 메인 흐름 ───
+    IN --> UI --> orch
+    CR <--> LG
+    orch --> PM
+    PM --> RES
+    RES --> DEV
+    DEV --> SB
 
-    %% ─── Main Flow ───
-    B --> orch --> PM
-    PM --> RES --> DEV
-    PM --> DEV
+    %% ─── LLM 연결 (점선) ───
+    PM -.- CLOUD
+    RES -.- CLOUD
+    DEV -.- LOCAL
 
-    %% ─── LLM Connections (dotted) ───
-    PM -.-|plan · verify| GPT
-    RES -.-|research| GEM
-    DEV -->|generate| QW --> GPU
-    DEV -->|fix| LL --> GPU
+    %% ─── 실행 결과 분기 ───
+    SB -- 성공 --> OUT
+    SB -. 실패 .-> ERR -. 재시도 .-> DEV
 
-    %% ─── Execution Loop ───
-    DEV --> EXEC
-    EXEC -- success --> PM
-    EXEC -. fail .-> ERR -. self-correct .-> DEV
-
-    %% ─── Intent Gate ───
-    PM --> OUT
-    PM -. rework .-> DEV
-
-    %% ─── Context Link ───
-    agents -.- ctx
-
-    %% ─── Styles ───
+    %% ─── 스타일 ───
     classDef mint fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
     classDef blue fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f
     classDef amber fill:#fef3c7,stroke:#fcd34d,color:#78350f
@@ -77,11 +52,7 @@ graph LR
     classDef green fill:#dcfce7,stroke:#86efac,color:#14532d
     classDef red fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
     classDef slate fill:#f1f5f9,stroke:#cbd5e1,color:#1e293b
-    classDef grey fill:#f3f4f6,stroke:#d1d5db,color:#374151
 
     style orch fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
     style agents fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
-    style cloud fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
-    style local fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
-    style sandbox fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
-    style ctx fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
+    style exec fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
