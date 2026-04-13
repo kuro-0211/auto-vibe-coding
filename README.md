@@ -16,16 +16,46 @@ Hybrid Vibe Coding Engine은 클라우드 LLM과 로컬 LLM의 협업을 통해,
 ## 🏗️ 시스템 아키텍처
 
 ```mermaid
-graph TB
-    INPUT["👤 사용자 · Vibe 입력"] --> DASH["📊 Streamlit Dashboard"]
-    DASH --> PM["🎯 PM Agent<br/>의도 해석 · 태스크 분해 · 의도 검증<br/>Cloud LLM: GPT-4o / Gemini"]
-    PM --> RES["🔍 Researcher Agent<br/>기술 리서치 · 문서 검색<br/>Cloud LLM"]
-    PM --> DEV["💻 Developer Agent<br/>코드 생성 · 수정 · 테스트<br/>Local LLM: Ollama"]
-    RES --> DEV
-    DEV --> SANDBOX["🐳 Docker Sandbox<br/>격리된 코드 실행 · 에러 로그 수집"]
-    SANDBOX -->|✅ 성공| PM
-    SANDBOX -->|❌ 실패| LOOP["🔄 Self-Correction Loop"]
-    LOOP --> DEV
+graph LR
+    A(Vibe Input):::mint --> B(Streamlit):::blue
+
+    subgraph agents [" Agent Pipeline "]
+        direction LR
+        PM(PM Agent):::amber --> RES(Researcher):::violet
+        PM --> DEV(Developer):::green
+        RES --> DEV
+    end
+
+    subgraph llm [" LLM "]
+        direction TB
+        CLOUD(GPT-4o · Gemini):::blue
+        LOCAL(Ollama · RTX 3080):::red
+    end
+
+    subgraph run [" Execution "]
+        SANDBOX(Docker Sandbox):::slate
+    end
+
+    B --> PM
+    PM -.- CLOUD
+    RES -.- CLOUD
+    DEV -.- LOCAL
+    DEV --> SANDBOX
+    SANDBOX -- success --> PM
+    SANDBOX -. fail .-> DEV
+    PM --> OUT(Output):::mint
+
+    classDef mint fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
+    classDef blue fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f
+    classDef amber fill:#fef3c7,stroke:#fcd34d,color:#78350f
+    classDef violet fill:#ede9fe,stroke:#c4b5fd,color:#3b0764
+    classDef green fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef red fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    classDef slate fill:#f1f5f9,stroke:#cbd5e1,color:#1e293b
+
+    style agents fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
+    style llm fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
+    style run fill:none,stroke:#e2e8f0,stroke-width:1px,stroke-dasharray:6,color:#94a3b8
 ```
 
 > 상세 아키텍처 다이어그램은 [`architecture.mermaid`](./architecture.mermaid) 파일을 참고하세요.
@@ -64,12 +94,18 @@ graph TB
 
 ```mermaid
 graph LR
-    A["💻 코드 생성"] --> B["🐳 Docker 실행"]
-    B -->|성공| C["🎯 PM 의도 검증"]
-    C -->|통과| D["✅ 완료"]
-    C -.->|미달| A
-    B -->|실패| E["📋 에러 로그 정제"]
-    E -->|최대 N회 반복| A
+    A(Code Gen):::green --> B(Docker Run):::blue
+    B -- success --> C{Intent\nCheck}:::amber
+    C -- pass --> D(Done):::mint
+    C -. retry .-> A
+    B -. fail .-> E(Error\nParsing):::red
+    E -. max N .-> A
+
+    classDef green fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef blue fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f
+    classDef amber fill:#fef3c7,stroke:#fcd34d,color:#78350f
+    classDef mint fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
+    classDef red fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
 ```
 
 1. Developer Agent가 코드를 생성하여 Docker 샌드박스에서 실행
