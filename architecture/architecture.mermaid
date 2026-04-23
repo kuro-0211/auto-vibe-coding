@@ -1,0 +1,67 @@
+flowchart LR
+    INPUT([" 🧑 사용자 입력\n키워드 / 목적 "]):::user
+
+    subgraph RA["① Research Agent"]
+        direction LR
+        TAVILY["🔍 Tavily\n웹 검색"]:::tool
+        GEMINI_R["✨ Gemini 2.5 Flash\n내용 정리 / 요약"]:::gemini
+        TAVILY --> GEMINI_R
+    end
+
+    subgraph CA["② Code Agent  (코드 불필요 시 스킵)"]
+        direction LR
+        OLLAMA_G["🦙 Ollama\nqwen2.5-coder\n코드 생성"]:::ollama
+        GPT_R["🤖 GPT-5.4-mini\n코드 리뷰 + 의도 검증"]:::gpt
+        DOCKER["🐳 Docker 샌드박스\n코드 실행"]:::docker
+        OLLAMA_G --> GPT_R
+        GPT_R --> DOCKER
+    end
+
+    subgraph SC["🔄 Self-Correction Loop"]
+        direction LR
+        ERR["⚠️ 에러 감지"]:::error
+        GEMINI_E["✨ Gemini 2.5 Flash\n에러 분석"]:::gemini
+        OLLAMA_F["🦙 Ollama\n수정 코드 재생성"]:::ollama
+        LIMIT{"최대 3회\n초과?"}:::decision
+        ERR --> GEMINI_E
+        GEMINI_E --> OLLAMA_F
+        OLLAMA_F --> LIMIT
+    end
+
+    subgraph OA["③ Output Agent"]
+        direction LR
+        GEMINI_O["✨ Gemini 2.5 Flash\n문서 정리 / 결과 출력"]:::gemini
+    end
+
+    subgraph EA["④ Email Agent  (요청 시에만)"]
+        direction LR
+        EMAIL_CHECK{"이메일\n발송 요청?"}:::decision
+        EMAIL_SEND["📧 Gmail SMTP\n결과물 발송"]:::email
+        EMAIL_CHECK -- "Yes" --> EMAIL_SEND
+        EMAIL_CHECK -- "No" --> SKIP_EMAIL(["화면 출력만"]):::output
+    end
+
+    OUTPUT([" 📄 최종 결과물\n문서 / 코드 / 이메일 "]):::output
+
+    INPUT --> RA
+    RA --> CA
+    RA --> OA
+    DOCKER -- "✅ 성공" --> OA
+    DOCKER -- "❌ 실패" --> ERR
+    LIMIT -- "No → 재시도" --> OLLAMA_G
+    LIMIT -- "Yes → 실패 리포트" --> OA
+    CA -- "스킵" --> OA
+    OA --> EA
+    EMAIL_SEND --> OUTPUT
+    SKIP_EMAIL --> OUTPUT
+
+    classDef user      fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f,font-weight:bold
+    classDef gemini    fill:#fef9c3,stroke:#fde047,color:#713f12
+    classDef gpt       fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef ollama    fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    classDef tool      fill:#ede9fe,stroke:#c4b5fd,color:#3b0764
+    classDef docker    fill:#e0f2fe,stroke:#7dd3fc,color:#0c4a6e
+    classDef error     fill:#fff1f2,stroke:#fda4af,color:#9f1239
+    classDef decision  fill:#fef3c7,stroke:#fcd34d,color:#78350f
+    classDef email     fill:#f0fdf4,stroke:#86efac,color:#14532d
+    classDef output    fill:#d1fae5,stroke:#6ee7b7,color:#064e3b,font-weight:bold

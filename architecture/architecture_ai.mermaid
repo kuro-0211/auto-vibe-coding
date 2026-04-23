@@ -1,0 +1,12 @@
+flowchart LR
+    G["✨ Gemini 2.5 Flash\n───────────────\n리서치 정리\n문서 작성\n에러 분석\n(무료 티어 일 20회)"]:::gemini
+    P["🤖 GPT-5.4-mini\n───────────────\n코드 리뷰\n의도 검증\n(학교 API · 토큰 최소화)"]:::gpt
+    O["🦙 Ollama  RTX 3080\n───────────────\nqwen2.5-coder\n코드 생성 / 수정\n(로컬 · 무료)"]:::ollama
+
+    G -- "에러 분석 결과 전달" --> O
+    P -- "리뷰 통과 / 재작성 요청" --> O
+    G -. "리서치 컨텍스트 공유" .-> P
+
+    classDef gemini    fill:#fef9c3,stroke:#fde047,color:#713f12
+    classDef gpt       fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef ollama    fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d

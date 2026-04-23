@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph HOST["WSL2 호스트 (Ubuntu 24.04)"]
+        direction LR
+        APP["🐍 Python 앱\n(에이전트 파이프라인)"]:::app
+        SOCK["/var/run/docker.sock"]:::tool
+    end
+
+    subgraph SB["🐳 Docker 샌드박스 (격리)"]
+        direction LR
+        RUN["코드 실행\nauto-vibe-sandbox"]:::docker
+        FS["임시 파일시스템\n(호스트 마운트 없음)"]:::slate
+        NET["네트워크 차단\n(network: none)"]:::slate
+        TIME["타임아웃 60초\nCPU 2코어 / 메모리 1GB"]:::slate
+        RUN --> FS
+        RUN --> NET
+        RUN --> TIME
+    end
+
+    HOST -- "Docker API" --> SB
+    SB -- "실행 결과 / 에러 로그" --> APP
+
+    classDef app    fill:#f8fafc,stroke:#94a3b8,color:#1e293b
+    classDef tool   fill:#ede9fe,stroke:#c4b5fd,color:#3b0764
+    classDef docker fill:#e0f2fe,stroke:#7dd3fc,color:#0c4a6e
+    classDef slate  fill:#f1f5f9,stroke:#cbd5e1,color:#475569

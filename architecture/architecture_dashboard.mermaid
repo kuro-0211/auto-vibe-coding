@@ -1,0 +1,12 @@
+flowchart LR
+    subgraph DASH["🖥️ Streamlit 대시보드 (localhost:8501)"]
+        direction LR
+        T1["🚀 실행 탭\n───────────────\n키워드/목적 입력\n파이프라인 단계별\n실시간 진행 표시"]:::app
+        T2["📊 모니터링 탭\n───────────────\n각 에이전트\n단계별 입출력 확인"]:::app
+        T3["📝 로그 탭\n───────────────\nLLM 호출 내역\n토큰 사용량 확인"]:::app
+    end
+
+    T1 -. "실행 후 데이터 공유" .-> T2
+    T1 -. "실행 후 데이터 공유" .-> T3
+
+    classDef app fill:#f8fafc,stroke:#94a3b8,color:#1e293b
