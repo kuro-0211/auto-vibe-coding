@@ -1,106 +1,134 @@
-graph TB
-    subgraph USER["👤 사용자"]
-        INPUT["Vibe 입력<br/>(추상적 의도/요구사항)"]
+---
+title: Auto Vibe Coding Engine — 시스템 아키텍처
+---
+
+%%  ================================================================
+%%  전체 파이프라인
+%%  ================================================================
+flowchart TD
+    INPUT([" 🧑 사용자 입력\n키워드 / 목적 "]):::user
+
+    %% ── Research Agent ──────────────────────────────────────────
+    subgraph RA["① Research Agent"]
+        direction TB
+        TAVILY["🔍 Tavily\n웹 검색"]:::tool
+        GEMINI_R["✨ Gemini Flash\n내용 정리 / 요약"]:::gemini
+        TAVILY --> GEMINI_R
     end
 
-    subgraph UI["🖥️ Streamlit Dashboard"]
-        MONITOR["워크플로우 모니터링"]
-        RESULT["최종 결과물 출력"]
+    %% ── Code Agent ───────────────────────────────────────────────
+    subgraph CA["② Code Agent  (코드 불필요 시 스킵)"]
+        direction TB
+        OLLAMA_G["🦙 Ollama\n코드 생성"]:::ollama
+        GPT_R["🤖 GPT-5.4 mini\n코드 리뷰 + 의도 검증"]:::gpt
+        DOCKER["🐳 Docker 샌드박스\n코드 실행"]:::docker
+
+        OLLAMA_G --> GPT_R
+        GPT_R --> DOCKER
     end
 
-    subgraph ORCHESTRATION["🧠 오케스트레이션 레이어"]
-        CREWAI["CrewAI<br/>역할 기반 협업"]
-        LANGGRAPH["LangGraph<br/>순환 제어 구조"]
+    %% ── Self-Correction ──────────────────────────────────────────
+    subgraph SC["🔄 Self-Correction Loop"]
+        direction TB
+        ERR["⚠️ 에러 감지"]:::error
+        GEMINI_E["✨ Gemini Flash\n에러 분석"]:::gemini
+        OLLAMA_F["🦙 Ollama\n수정 코드 재생성"]:::ollama
+        LIMIT{"최대 3회\n초과?"}:::decision
+
+        ERR --> GEMINI_E
+        GEMINI_E --> OLLAMA_F
+        OLLAMA_F --> LIMIT
     end
 
-    subgraph AGENTS["🤖 멀티 에이전트 시스템"]
-        subgraph PM["PM Agent (팀장)"]
-            PM_PARSE["의도 해석 &<br/>태스크 분해"]
-            PM_VERIFY["의도 검증<br/>(Intent Verification)"]
-        end
-
-        subgraph RESEARCH["Researcher Agent (연구원)"]
-            RES_SEARCH["기술 문서 검색"]
-            RES_REFINE["검색 결과 정제"]
-        end
-
-        subgraph DEV["Developer Agent (개발자)"]
-            DEV_CODE["코드 생성"]
-            DEV_FIX["에러 분석 & 수정"]
-        end
+    %% ── Output Agent ─────────────────────────────────────────────
+    subgraph OA["③ Output Agent"]
+        direction TB
+        GEMINI_O["✨ Gemini Flash\n문서 정리 / 결과 출력"]:::gemini
     end
 
-    subgraph CLOUD_LLM["☁️ Cloud LLM"]
-        GPT4O["OpenAI GPT-4o<br/>(학교 API Gateway)"]
-        GEMINI["Gemini 3 Flash<br/>(무료 티어)"]
+    %% ── Email Agent ──────────────────────────────────────────────
+    subgraph EA["④ Email Agent  (요청 시에만)"]
+        direction TB
+        EMAIL_CHECK{"이메일\n발송 요청?"}:::decision
+        EMAIL_SEND["📧 Gmail SMTP\n/ SendGrid\n결과물 발송"]:::email
+        EMAIL_CHECK -- "Yes" --> EMAIL_SEND
+        EMAIL_CHECK -- "No" --> SKIP_EMAIL(["화면 출력만"]):::output
     end
 
-    subgraph LOCAL_LLM["🏠 Local LLM (Ollama)"]
-        QWEN["Qwen2.5-Coder"]
-        LLAMA["Llama 3.3"]
-        GPU["NVIDIA RTX 3080<br/>추론 가속"]
+    %% ── 최종 출력 ─────────────────────────────────────────────────
+    OUTPUT([" 📄 최종 결과물\n문서 / 코드 / 이메일 "]):::output
+
+    %% ── 흐름 연결 ─────────────────────────────────────────────────
+    INPUT --> RA
+    RA --> CA
+    RA --> OA
+
+    DOCKER -- "✅ 성공" --> OA
+    DOCKER -- "❌ 실패" --> ERR
+
+    LIMIT -- "No → 재시도" --> OLLAMA_G
+    LIMIT -- "Yes → 실패 리포트" --> OA
+
+    CA -- "스킵" --> OA
+
+    OA --> EA
+    EMAIL_SEND --> OUTPUT
+    SKIP_EMAIL --> OUTPUT
+
+
+%%  ================================================================
+%%  AI 협업 구조
+%%  ================================================================
+flowchart LR
+    subgraph AI["🤝 AI 역할 분담"]
+        direction TB
+        G["✨ Gemini Flash\n───────────────\n리서치 정리\n문서 작성\n에러 분석"]:::gemini
+        P["🤖 GPT-5.4 mini\n───────────────\n코드 리뷰\n의도 검증\n(학교 API · 토큰 절약)"]:::gpt
+        O["🦙 Ollama  RTX 3080\n───────────────\n코드 생성\n코드 수정\n(로컬 · 무료)"]:::ollama
     end
 
-    subgraph SANDBOX["🐳 Docker Sandbox"]
-        EXEC["격리된 코드 실행"]
-        ERR["에러 로그 수집 & 정제"]
+    G -- "에러 분석 결과 전달" --> O
+    P -- "리뷰 통과 / 재작성 요청" --> O
+    G -. "리서치 컨텍스트 공유" .-> P
+
+
+%%  ================================================================
+%%  Docker 샌드박스 격리 구조
+%%  ================================================================
+flowchart TD
+    subgraph HOST["WSL2 호스트"]
+        APP["🐍 Python 앱\n(에이전트 파이프라인)"]:::app
+        SOCK["/var/run/docker.sock"]:::tool
     end
 
-    subgraph CONTEXT["📦 컨텍스트 관리"]
-        COMPRESS["토큰 압축 · 대화 요약"]
+    subgraph SB["🐳 Docker 샌드박스 (격리)"]
+        direction TB
+        RUN["코드 실행"]:::docker
+        FS["임시 파일시스템\n(호스트 마운트 없음)"]:::slate
+        NET["네트워크 차단\n(network: none)"]:::slate
+        TIME["타임아웃 제한\n+ CPU/메모리 제한"]:::slate
+        RUN --> FS
+        RUN --> NET
+        RUN --> TIME
     end
 
-    %% ── 메인 흐름 (위 → 아래) ──
-    INPUT --> MONITOR
-    MONITOR --> CREWAI
-    CREWAI <--> LANGGRAPH
-    CREWAI --> PM_PARSE
+    APP -- "Docker API" --> SOCK
+    SOCK -- "컨테이너 생성/실행" --> SB
+    SB -- "실행 결과 / 에러 로그" --> APP
 
-    %% ── 에이전트 간 흐름 ──
-    PM_PARSE --> RES_SEARCH
-    RES_REFINE --> DEV_CODE
 
-    %% ── Cloud LLM 연결 ──
-    PM -.->|기획 · 설계 · 검증| GPT4O
-    RESEARCH -.->|리서치| GEMINI
-
-    %% ── Local LLM 연결 ──
-    DEV -.->|코드 생성 · 수정| QWEN
-    DEV -.->|코드 수정| LLAMA
-    QWEN --> GPU
-    LLAMA --> GPU
-
-    %% ── 실행 ──
-    DEV_CODE --> EXEC
-
-    %% ── 실행 결과 분기 ──
-    EXEC -->|성공| PM_VERIFY
-    EXEC -->|실패| ERR
-
-    %% ── Self-Correction (점선) ──
-    ERR -.->|재시도| DEV_FIX
-    DEV_FIX -.-> EXEC
-
-    %% ── 의도 검증 결과 ──
-    PM_VERIFY -->|통과| RESULT
-    PM_VERIFY -.->|미달| PM_PARSE
-
-    %% ── 컨텍스트 ──
-    AGENTS <-.-> COMPRESS
-
-    %% ── 스타일 ──
-    classDef user fill:#4A90D9,stroke:#2E6CB0,color:#fff,stroke-width:2px
-    classDef ui fill:#50C878,stroke:#3DA35D,color:#fff,stroke-width:2px
-    classDef agent fill:#FFB347,stroke:#E09030,color:#333,stroke-width:2px
-    classDef cloud fill:#9B89B3,stroke:#7B6B93,color:#fff,stroke-width:2px
-    classDef local fill:#FF6B6B,stroke:#D94545,color:#fff,stroke-width:2px
-    classDef sandbox fill:#4DB8DB,stroke:#2E96B5,color:#fff,stroke-width:2px
-    classDef context fill:#95A5A6,stroke:#7F8C8D,color:#fff,stroke-width:2px
-
-    class INPUT user
-    class MONITOR,RESULT ui
-    class PM_PARSE,PM_VERIFY,RES_SEARCH,RES_REFINE,DEV_CODE,DEV_FIX agent
-    class GPT4O,GEMINI cloud
-    class QWEN,LLAMA,GPU local
-    class EXEC,ERR sandbox
-    class COMPRESS context
+%%  ================================================================
+%%  스타일 정의
+%%  ================================================================
+    classDef user      fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f,font-weight:bold
+    classDef gemini    fill:#fef9c3,stroke:#fde047,color:#713f12
+    classDef gpt       fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef ollama    fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    classDef tool      fill:#ede9fe,stroke:#c4b5fd,color:#3b0764
+    classDef docker    fill:#e0f2fe,stroke:#7dd3fc,color:#0c4a6e
+    classDef error     fill:#fff1f2,stroke:#fda4af,color:#9f1239
+    classDef decision  fill:#fef3c7,stroke:#fcd34d,color:#78350f
+    classDef email     fill:#f0fdf4,stroke:#86efac,color:#14532d
+    classDef output    fill:#d1fae5,stroke:#6ee7b7,color:#064e3b,font-weight:bold
+    classDef slate     fill:#f1f5f9,stroke:#cbd5e1,color:#475569
+    classDef app       fill:#f8fafc,stroke:#94a3b8,color:#1e293b
