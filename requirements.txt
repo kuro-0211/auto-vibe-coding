@@ -1,0 +1,27 @@
+# 워크플로우
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+
+# LLM
+langchain-google-genai>=2.0.0
+google-genai>=1.0.0
+langchain-openai>=0.2.0
+langchain-ollama>=0.2.0
+openai>=1.0.0
+
+# 웹 검색
+tavily-python>=0.3.0
+
+# 샌드박스
+docker>=7.0.0
+
+# 이메일
+sendgrid>=6.11.0
+
+# UI
+streamlit>=1.40.0
+
+# 유틸
+python-dotenv>=1.0.0
+pyyaml>=6.0.0

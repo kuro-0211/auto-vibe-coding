@@ -1,0 +1,17 @@
+# models.yaml — LLM 모델 설정
+cat > config/models.yaml << 'EOF'
+gemini:
+  model: "gemini-3-flash-preview"
+  temperature: 0.3
+  max_tokens: 8000
+
+school_api:
+  model: "gpt-5-mini"
+  temperature: 1
+  max_tokens: 4000
+
+ollama:
+  model: "qwen2.5-coder"
+  base_url: "http://ollama:11434"
+  temperature: 0.2
+EOF

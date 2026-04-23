@@ -8,69 +8,56 @@ title: Auto Vibe Coding Engine — 시스템 아키텍처
 flowchart TD
     INPUT([" 🧑 사용자 입력\n키워드 / 목적 "]):::user
 
-    %% ── Research Agent ──────────────────────────────────────────
     subgraph RA["① Research Agent"]
         direction TB
         TAVILY["🔍 Tavily\n웹 검색"]:::tool
-        GEMINI_R["✨ Gemini Flash\n내용 정리 / 요약"]:::gemini
+        GEMINI_R["✨ Gemini 2.5 Flash\n내용 정리 / 요약"]:::gemini
         TAVILY --> GEMINI_R
     end
 
-    %% ── Code Agent ───────────────────────────────────────────────
     subgraph CA["② Code Agent  (코드 불필요 시 스킵)"]
         direction TB
-        OLLAMA_G["🦙 Ollama\n코드 생성"]:::ollama
-        GPT_R["🤖 GPT-5.4 mini\n코드 리뷰 + 의도 검증"]:::gpt
-        DOCKER["🐳 Docker 샌드박스\n코드 실행"]:::docker
-
+        OLLAMA_G["🦙 Ollama\nqwen2.5-coder\n코드 생성"]:::ollama
+        GPT_R["🤖 GPT-5.4-mini\n코드 리뷰 + 의도 검증\n(학교 API)"]:::gpt
+        DOCKER["🐳 Docker 샌드박스\n코드 실행\n타임아웃 60초 / 메모리 1GB"]:::docker
         OLLAMA_G --> GPT_R
         GPT_R --> DOCKER
     end
 
-    %% ── Self-Correction ──────────────────────────────────────────
     subgraph SC["🔄 Self-Correction Loop"]
         direction TB
         ERR["⚠️ 에러 감지"]:::error
-        GEMINI_E["✨ Gemini Flash\n에러 분석"]:::gemini
+        GEMINI_E["✨ Gemini 2.5 Flash\n에러 분석"]:::gemini
         OLLAMA_F["🦙 Ollama\n수정 코드 재생성"]:::ollama
         LIMIT{"최대 3회\n초과?"}:::decision
-
         ERR --> GEMINI_E
         GEMINI_E --> OLLAMA_F
         OLLAMA_F --> LIMIT
     end
 
-    %% ── Output Agent ─────────────────────────────────────────────
     subgraph OA["③ Output Agent"]
         direction TB
-        GEMINI_O["✨ Gemini Flash\n문서 정리 / 결과 출력"]:::gemini
+        GEMINI_O["✨ Gemini 2.5 Flash\n문서 정리 / 결과 출력"]:::gemini
     end
 
-    %% ── Email Agent ──────────────────────────────────────────────
     subgraph EA["④ Email Agent  (요청 시에만)"]
         direction TB
         EMAIL_CHECK{"이메일\n발송 요청?"}:::decision
-        EMAIL_SEND["📧 Gmail SMTP\n/ SendGrid\n결과물 발송"]:::email
+        EMAIL_SEND["📧 Gmail SMTP\n결과물 발송"]:::email
         EMAIL_CHECK -- "Yes" --> EMAIL_SEND
         EMAIL_CHECK -- "No" --> SKIP_EMAIL(["화면 출력만"]):::output
     end
 
-    %% ── 최종 출력 ─────────────────────────────────────────────────
     OUTPUT([" 📄 최종 결과물\n문서 / 코드 / 이메일 "]):::output
 
-    %% ── 흐름 연결 ─────────────────────────────────────────────────
     INPUT --> RA
     RA --> CA
     RA --> OA
-
     DOCKER -- "✅ 성공" --> OA
     DOCKER -- "❌ 실패" --> ERR
-
     LIMIT -- "No → 재시도" --> OLLAMA_G
     LIMIT -- "Yes → 실패 리포트" --> OA
-
     CA -- "스킵" --> OA
-
     OA --> EA
     EMAIL_SEND --> OUTPUT
     SKIP_EMAIL --> OUTPUT
@@ -82,9 +69,9 @@ flowchart TD
 flowchart LR
     subgraph AI["🤝 AI 역할 분담"]
         direction TB
-        G["✨ Gemini Flash\n───────────────\n리서치 정리\n문서 작성\n에러 분석"]:::gemini
-        P["🤖 GPT-5.4 mini\n───────────────\n코드 리뷰\n의도 검증\n(학교 API · 토큰 절약)"]:::gpt
-        O["🦙 Ollama  RTX 3080\n───────────────\n코드 생성\n코드 수정\n(로컬 · 무료)"]:::ollama
+        G["✨ Gemini 2.5 Flash\n───────────────\n리서치 정리\n문서 작성\n에러 분석\n(무료 티어 일 20회)"]:::gemini
+        P["🤖 GPT-5.4-mini\n───────────────\n코드 리뷰\n의도 검증\n(학교 API · 토큰 최소화)"]:::gpt
+        O["🦙 Ollama  RTX 3080\n───────────────\nqwen2.5-coder\n코드 생성\n코드 수정\n(로컬 · 무료)"]:::ollama
     end
 
     G -- "에러 분석 결과 전달" --> O
@@ -93,20 +80,35 @@ flowchart LR
 
 
 %%  ================================================================
+%%  Streamlit 대시보드 구조
+%%  ================================================================
+flowchart TD
+    subgraph DASH["🖥️ Streamlit 대시보드 (localhost:8501)"]
+        direction TB
+        T1["🚀 실행 탭\n───────────────\n키워드/목적 입력\n파이프라인 단계별\n실시간 진행 표시"]:::app
+        T2["📊 모니터링 탭\n───────────────\n각 에이전트\n단계별 입출력 확인"]:::app
+        T3["📝 로그 탭\n───────────────\nLLM 호출 내역\n토큰 사용량 확인"]:::app
+    end
+
+    T1 -. "실행 후 데이터 공유" .-> T2
+    T1 -. "실행 후 데이터 공유" .-> T3
+
+
+%%  ================================================================
 %%  Docker 샌드박스 격리 구조
 %%  ================================================================
 flowchart TD
-    subgraph HOST["WSL2 호스트"]
+    subgraph HOST["WSL2 호스트 (Ubuntu 24.04)"]
         APP["🐍 Python 앱\n(에이전트 파이프라인)"]:::app
         SOCK["/var/run/docker.sock"]:::tool
     end
 
     subgraph SB["🐳 Docker 샌드박스 (격리)"]
         direction TB
-        RUN["코드 실행"]:::docker
+        RUN["코드 실행\nauto-vibe-sandbox"]:::docker
         FS["임시 파일시스템\n(호스트 마운트 없음)"]:::slate
         NET["네트워크 차단\n(network: none)"]:::slate
-        TIME["타임아웃 제한\n+ CPU/메모리 제한"]:::slate
+        TIME["타임아웃 60초\nCPU 2코어 / 메모리 1GB"]:::slate
         RUN --> FS
         RUN --> NET
         RUN --> TIME
