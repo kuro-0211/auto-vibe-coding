@@ -1,11 +1,16 @@
 import os
-from google import genai
+from langchain_ollama import ChatOllama
+from langchain_core.messages import HumanMessage
 from utils.logger import pipeline_logger
 
 def run_output(state: dict) -> str:
     pipeline_logger.log_step("Output Agent", "running")
 
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    llm = ChatOllama(
+        model=os.getenv("GEMMA_MODEL", "gemma3:4b"),
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
+        temperature=0.3
+    )
 
     research = state.get("research_result", "")
     code = state.get("code_result", "")
@@ -48,21 +53,14 @@ def run_output(state: dict) -> str:
 한국어로 작성하세요.
 """
 
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        contents=prompt
-    )
+    response = llm.invoke([HumanMessage(content=prompt)])
 
     pipeline_logger.log_llm(
-        model="gemini-2.5-flash",
+        model="gemma3:4b",
         prompt=prompt,
-        response=response.text,
-        tokens=len(prompt.split()) + len(response.text.split())
+        response=response.content,
+        tokens=0
     )
+    pipeline_logger.log_step("Output Agent", "done", output_data=response.content)
 
-    pipeline_logger.log_step(
-        "Output Agent", "done",
-        output_data=response.text
-    )
-
-    return response.text
+    return response.content

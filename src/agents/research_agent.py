@@ -1,6 +1,6 @@
 import os
 from tavily import TavilyClient
-from google import genai
+from openai import OpenAI
 from utils.logger import pipeline_logger
 
 def run_research(user_input: str) -> str:
@@ -19,8 +19,11 @@ def run_research(user_input: str) -> str:
         for r in search_results.get("results", [])
     ])
 
-    # ── Gemini Flash 정리 ───────────────────────────────────
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    # ── 학교 API로 검색 결과 정리 ───────────────────────────
+    client = OpenAI(
+        api_key=os.getenv("SCHOOL_API_KEY"),
+        base_url=os.getenv("SCHOOL_API_BASE_URL")
+    )
 
     prompt = f"""
 다음은 "{user_input}"에 대한 웹 검색 결과입니다.
@@ -36,22 +39,22 @@ def run_research(user_input: str) -> str:
 위 형식으로 명확하게 정리해주세요. 한국어로 작성하세요.
 """
 
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        contents=prompt
+    response = client.chat.completions.create(
+        model=os.getenv("SCHOOL_MODEL", "gpt-5.4-mini"),
+        temperature=1,
+        messages=[{"role": "user", "content": prompt}]
     )
+
+    result = response.choices[0].message.content
+    tokens = response.usage.total_tokens if response.usage else 0
 
     pipeline_logger.log_llm(
-        model="gemini-2.5-flash",
+        model="gpt-5.4-mini",
         prompt=prompt,
-        response=response.text,
-        tokens=len(prompt.split()) + len(response.text.split())
+        response=result,
+        tokens=tokens
     )
+    pipeline_logger.log_step("Research Agent", "done",
+        input_data=user_input, output_data=result)
 
-    pipeline_logger.log_step(
-        "Research Agent", "done",
-        input_data=user_input,
-        output_data=response.text
-    )
-
-    return response.text
+    return result

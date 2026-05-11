@@ -1,7 +1,14 @@
 import os
+import re
 import docker
-import tempfile
 import yaml
+
+def clean_code(code: str) -> str:
+    """LLM이 생성한 코드에서 순수 Python 코드만 추출"""
+    # 백틱 코드블록 제거
+    code = re.sub(r"```python\s*", "", code)
+    code = re.sub(r"```\s*", "", code)
+    return code.strip()
 
 def execute_code(code: str) -> dict:
     """Docker 샌드박스에서 코드 실행"""
@@ -9,24 +16,16 @@ def execute_code(code: str) -> dict:
     with open("config/sandbox.yaml") as f:
         config = yaml.safe_load(f)["sandbox"]
 
-    client = docker.from_env()
+    # 코드 정제
+    clean = clean_code(code)
+    print(f"[샌드박스] 실행 코드:\n{clean}")
 
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".py",
-        delete=False,
-        dir="/tmp"
-    ) as f:
-        f.write(code)
-        tmp_path = f.name
+    client = docker.from_env()
 
     try:
         container = client.containers.run(
             image=config["image"],
-            command=f"python /code/{os.path.basename(tmp_path)}",
-            volumes={
-                "/tmp": {"bind": "/code", "mode": "ro"}
-            },
+            command=["python", "-c", clean],
             mem_limit=config["memory_limit"],
             nano_cpus=int(float(config["cpu_limit"]) * 1e9),
             network_mode=config["network"],
@@ -46,7 +45,3 @@ def execute_code(code: str) -> dict:
     except Exception as e:
         print(f"샌드박스 에러: {str(e)}")
         return {"success": False, "output": None, "error": str(e)}
-
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
