@@ -6,109 +6,106 @@
 
 ## 🔴 진행 중
 
-### [ISSUE-001] Gemini 2.5 Flash 일일 한도 소진
-- **증상:** `429 RESOURCE_EXHAUSTED` 에러 발생
-- **원인:** 무료 티어 기준 하루 20회 요청 제한
-- **영향:** Research Agent, Output Agent, 에러 분석 단계 전체 중단
-- **임시 대응:** 한도 리셋(매일 자정) 후 재사용
-- **해결 방향:** 학교 API Gateway를 통한 Gemini 호출로 대체 검토
-  ```
-  현재: Gemini API 키 → 직접 호출 (일 20회 제한)
-  대안: 학교 API Gateway → gemini-3-flash-preview 호출
-  ```
+### [ISSUE-001] 학교 API 토큰 한도
+- **증상:** 요청이 많아지면 토큰 소진으로 API 호출 실패
+- **원인:** 학교 API 토큰 한도가 적음
+- **현재 전략:** GPT-5.4-mini는 리서치 정리 + 코드 생성 판단만 사용, 나머지는 로컬 모델로 처리
+- **해결 방향:** 프롬프트 길이 최소화, 캐싱 도입 검토
 
 ---
 
-### [ISSUE-002] Self-Correction 3회 초과 시 4번째 실행 버그
-- **증상:** 재시도 횟수가 3회를 초과해도 루프가 한 번 더 실행됨
-- **원인:** `graph.py`의 `check_execution` 분기 조건 오류
-- **현재 상태:** 수정 완료 (확인 필요)
-- **수정 내용:**
-  ```python
-  def check_execution(state: AgentState) -> str:
-      if state["execution_result"]["success"]:
-          return "output"
-      elif state["retry_count"] >= 3:  # 3회 초과 시 output으로
-          return "output"
-      else:
-          return "error_analysis"
-  ```
+### [ISSUE-002] Gemma 에러 분석 결과 간헐적 누락
+- **증상:** 에러 분석 실행은 되나 분석 내용이 빈 문자열로 반환되는 경우 발생
+- **원인:** Gemma 응답 지연 또는 프롬프트 처리 실패
+- **현재 상태:** 프롬프트 단순화로 개선됨, 간헐적으로 재발 가능
+- **해결 방향:** 응답 검증 로직 추가, 재시도 메커니즘 도입
 
 ---
 
-### [ISSUE-003] Gmail 이메일 발송 실패
-- **증상:** `535 Username and Password not accepted` 에러
-- **원인:** Gmail 앱 비밀번호 미설정
-- **현재 상태:** 이메일 기능 임시 비활성화
-- **해결 방법:**
-  1. Google 계정 → 보안 → 2단계 인증 활성화
-  2. 앱 비밀번호 발급 (메일 항목 선택)
-  3. `.env`의 `EMAIL_PASSWORD`에 앱 비밀번호 입력
+### [ISSUE-003] 외부 네트워크 차단으로 인한 코드 실행 실패
+- **증상:** 외부 API 호출 코드 실행 시 항상 실패
+- **원인:** Docker 샌드박스 `network: none` 설정으로 네트워크 완전 차단
+- **현재 상태:** 의도된 동작이나 사용자에게 명확한 안내 필요
+- **해결 방향:** 네트워크 필요 여부를 코드 생성 전에 판단하여 사용자에게 안내
 
 ---
 
-### [ISSUE-004] Streamlit UI 실행 후 결과 미반영
-- **증상:** 실행 버튼 클릭 후 단계 표시가 업데이트되지 않음
-- **원인:** Streamlit 세션 상태와 LangGraph 스트리밍 간 동기화 문제
-- **현재 상태:** `graph.stream()` 방식으로 개선 적용
-- **추가 확인 필요:** 모니터링/로그 탭 데이터 갱신 여부
-
----
-
-### [ISSUE-005] Code Agent 스킵 판단 부정확
-- **증상:** 코드 생성이 불필요한 요청에도 Code Agent가 실행되는 경우 있음
-- **원인:** 현재 키워드 기반 단순 분류 방식 사용
-  ```python
-  keywords = ["코드", "만들어", "구현", "작성", "짜줘", "개발", "프로그램", "스크립트"]
-  ```
-- **해결 방향:** LLM 기반 의도 분류로 개선 필요
+### [ISSUE-004] Gmail 앱 비밀번호 방식 인증 실패
+- **증상:** Gmail SMTP 인증 실패 (`535 Username and Password not accepted`)
+- **해결:** 네이버 SMTP로 전환하여 해결
+- **현재 상태:** 네이버 SMTP로 정상 동작 중
 
 ---
 
 ## 🟡 검토 중
 
-### [ISSUE-006] 로컬 모델 VRAM 한계
-- **현황:** RTX 3080 12GB 기준 동시 실행 가능 모델 제한
-  ```
-  qwen2.5-coder  4.7GB
-  추가 모델       최대 약 7GB 여유
-  ```
-- **검토 사항:**
-  - `qwen3.5:4b` (2.7GB) 추가 시 합계 7.4GB → 안정적
-  - `qwen3.5:9b` (5.8GB) 추가 시 합계 10.5GB → 아슬아슬
-  - `qwen3.6:35b-a3b` (24GB) → VRAM 초과, 현재 Ollama 미지원
-- **결정 필요:** 로컬 2개 + 학교 API 1개 조합 확정
+### [ISSUE-005] 멀티스텝 프로젝트 관리 미구현
+- **현황:** Checkpointer는 구현되어 있으나 이전 세션 불러오기 UI 미구현
+- **필요 기능:**
+  - 히스토리 탭에서 이전 세션 목록 표시
+  - 이전 세션 불러와서 이어서 작업
+  - 프로젝트 이름 붙여서 관리
+- **우선순위:** 낮음 (MVP 완성 후 추가 예정)
 
 ---
 
-### [ISSUE-007] 토큰 사용량 최적화
-- **현황:** GPT-5.4-mini 학교 API 토큰 한도가 적음
-- **현재 전략:** 코드 리뷰 시 코드 + 의도 요약만 전달 (전체 리서치 내용 제외)
-- **목표:** 요청당 학교 API 토큰 1,500 이하 유지
+### [ISSUE-006] 파일 업로드/다운로드 미지원
+- **현황:** 사용자가 CSV, JSON 등 파일을 업로드하여 분석 불가
+- **필요 기능:** 파일 업로드 → 샌드박스에 마운트 → 코드에서 접근
+- **우선순위:** 중간
+
+---
+
+### [ISSUE-007] 스케줄링 미지원
+- **현황:** 수동 실행만 가능, 자동 반복 실행 불가
+- **필요 기능:** "매일 오전 9시에 실행" 등 스케줄 설정
+- **우선순위:** 낮음
 
 ---
 
 ## ✅ 해결 완료
 
 ### [RESOLVED-001] `langchain.schema` ImportError
-- **증상:** `ModuleNotFoundError: No module named 'langchain.schema'`
-- **원인:** LangChain 최신 버전에서 경로 변경
 - **해결:** `from langchain_core.messages import HumanMessage` 로 변경
 
 ### [RESOLVED-002] `google-generativeai` deprecated 경고
-- **증상:** `FutureWarning: All support for the google.generativeai package has ended`
-- **해결:** `google-genai` 패키지로 교체 및 코드 전면 수정
+- **해결:** Gemini API 제거, 학교 API + 로컬 모델로 완전 대체
 
 ### [RESOLVED-003] 소스파일 첫 줄 `cat` 명령어 오염
-- **증상:** `NameError: name 'cat' is not defined`
-- **원인:** `cat > file << 'EOF'` 명령어가 파일 내용에 포함됨
 - **해결:** `sed -i '/^EOF$/d'` 및 `sed -i '1{/^cat/d}'` 로 일괄 수정
 
-### [RESOLVED-004] docker-compose `timeout` 파라미터 오류
-- **증상:** `run() got an unexpected keyword argument 'timeout'`
-- **해결:** Docker SDK에서 `timeout` 파라미터 제거
+### [RESOLVED-004] Docker 샌드박스 파일 경로 문제
+- **해결:** 파일 마운트 방식 → `stdin` 방식으로 변경
 
-### [RESOLVED-005] `docker-compose up --build` ContainerConfig 오류
-- **증상:** `KeyError: 'ContainerConfig'`
-- **원인:** `docker-compose` 버전(1.29.2) 호환성 문제
-- **해결:** `docker-compose down` 후 재실행으로 우회
+### [RESOLVED-005] 코드에 백틱(` ``` `) 포함으로 실행 실패
+- **해결:** `executor.py`에 `clean_code()` 함수 추가하여 전처리
+
+### [RESOLVED-006] CSS `<style>` 태그 내용이 텍스트로 출력
+- **해결:** `st.markdown` → `st.html()` 로 변경
+
+### [RESOLVED-007] Self-Correction 3회 초과 시 4번째 실행 버그
+- **해결:** `check_execution` 분기 조건 수정
+
+### [RESOLVED-008] 에러 분석 내용에 HTML 태그 노출
+- **해결:** `html.escape()` 처리로 HTML 이스케이프
+
+### [RESOLVED-009] Gmail SMTP 인증 실패
+- **해결:** 네이버 SMTP + 앱 비밀번호 방식으로 전환
+
+### [RESOLVED-010] Gemini API 일일 한도 초과
+- **해결:** Gemini API 완전 제거, 학교 API + 로컬 모델로 대체
+  - 리서치 정리 → GPT-5.4-mini (학교 API)
+  - 에러 분석, 문서 작성 → gemma3:4b (로컬)
+  - 코드 생성, 리뷰 → qwen2.5-coder (로컬)
+
+### [RESOLVED-011] 코드 생성 필요 여부 키워드 기반 판단 부정확
+- **해결:** GPT-5.4-mini LLM 기반 의도 판단으로 전환 + 키워드 폴백 유지
+
+### [RESOLVED-012] 리서치 결과 품질 낮음 (500자 제한, 출처 없음)
+- **해결:** 신뢰 도메인 우선 검색, 출처 URL 포함, 구조화된 형식 (핵심 요약 / 주요 내용 / 참고 출처)
+
+### [RESOLVED-013] 에러 분석 내용 대시보드 미표시
+- **해결:** `AgentState`에 `error_analysis` 필드 추가, 튜플 반환으로 분석 결과 전달
+
+### [RESOLVED-014] 실행 결과 포맷팅 부재
+- **해결:** 실행 시간, 출력 줄 수 메타정보 추가, 결과 구조 개선 (성공/실패/리서치 분기)
