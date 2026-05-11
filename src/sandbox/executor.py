@@ -2,25 +2,23 @@ import os
 import re
 import docker
 import yaml
+import time
 
 def clean_code(code: str) -> str:
-    """LLM이 생성한 코드에서 순수 Python 코드만 추출"""
-    # 백틱 코드블록 제거
-    code = re.sub(r"```python\s*", "", code)
-    code = re.sub(r"```\s*", "", code)
-    return code.strip()
+    code = re.sub(r"```[\w]*\n?", "", code)
+    code = re.sub(r"```", "", code)
+    code = code.strip()
+    return code
 
 def execute_code(code: str) -> dict:
-    """Docker 샌드박스에서 코드 실행"""
-
     with open("config/sandbox.yaml") as f:
         config = yaml.safe_load(f)["sandbox"]
 
-    # 코드 정제
     clean = clean_code(code)
-    print(f"[샌드박스] 실행 코드:\n{clean}")
+    print(f"[샌드박스] 실행 코드:\n{clean[:200]}")
 
     client = docker.from_env()
+    start_time = time.time()
 
     try:
         container = client.containers.run(
@@ -35,13 +33,36 @@ def execute_code(code: str) -> dict:
             stderr=True
         )
 
+        elapsed = round(time.time() - start_time, 2)
         output = container.decode("utf-8") if isinstance(container, bytes) else str(container)
-        return {"success": True, "output": output, "error": None}
+        output = output.strip()
+
+        return {
+            "success": True,
+            "output": output,
+            "error": None,
+            "elapsed": elapsed,
+            "lines": len(output.splitlines())
+        }
 
     except docker.errors.ContainerError as e:
+        elapsed = round(time.time() - start_time, 2)
         error_msg = e.stderr.decode("utf-8") if e.stderr else str(e)
-        return {"success": False, "output": None, "error": error_msg}
+        return {
+            "success": False,
+            "output": None,
+            "error": error_msg,
+            "elapsed": elapsed,
+            "lines": 0
+        }
 
     except Exception as e:
+        elapsed = round(time.time() - start_time, 2)
         print(f"샌드박스 에러: {str(e)}")
-        return {"success": False, "output": None, "error": str(e)}
+        return {
+            "success": False,
+            "output": None,
+            "error": str(e),
+            "elapsed": elapsed,
+            "lines": 0
+        }

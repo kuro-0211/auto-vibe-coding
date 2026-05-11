@@ -20,6 +20,7 @@ class AgentState(TypedDict):
     execution_result: Optional[dict]
     final_output: Optional[str]
     error: Optional[str]
+    error_analysis: Optional[str]
     retry_count: int
     needs_code: Optional[bool]
     human_approved: Optional[bool]
@@ -31,8 +32,49 @@ def research_node(state: AgentState) -> AgentState:
     return {**state, "research_result": result}
 
 def code_decision_node(state: AgentState) -> AgentState:
-    keywords = ["코드", "만들어", "구현", "작성", "짜줘", "개발", "프로그램", "스크립트", "함수", "클래스"]
-    needs_code = any(k in state["user_input"] for k in keywords)
+    from openai import OpenAI
+    import json
+    import os
+
+    try:
+        client = OpenAI(
+            api_key=os.getenv("SCHOOL_API_KEY"),
+            base_url=os.getenv("SCHOOL_API_BASE_URL")
+        )
+
+        response = client.chat.completions.create(
+            model=os.getenv("SCHOOL_MODEL", "gpt-5.4-mini"),
+            temperature=1,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "사용자 요청이 코드 생성이 필요한지 판단하세요. 반드시 JSON으로만 응답: {\"needs_code\": true} 또는 {\"needs_code\": false}"
+                },
+                {
+                    "role": "user",
+                    "content": f"요청: {state['user_input']}"
+                }
+            ]
+        )
+
+        content = response.choices[0].message.content
+        if content is None:
+            raise ValueError("응답이 None")
+
+        content = content.strip()
+        if "true" in content.lower():
+            needs_code = True
+        elif "false" in content.lower():
+            needs_code = False
+        else:
+            result = json.loads(content)
+            needs_code = result.get("needs_code", False)
+
+    except Exception as e:
+        print(f"⚠️ code_decision 오류, 키워드 방식으로 폴백: {e}")
+        keywords = ["코드", "만들어", "구현", "작성", "짜줘", "개발", "프로그램", "스크립트", "함수", "클래스"]
+        needs_code = any(k in state["user_input"] for k in keywords)
+
     print(f"💡 코드 생성 필요: {needs_code}")
     return {**state, "needs_code": needs_code}
 
@@ -58,21 +100,38 @@ def human_approval_node(state: AgentState) -> AgentState:
     return {**state, "human_approved": None}
 
 def execution_node(state: AgentState) -> AgentState:
+    if not state.get("code_result"):
+        print("💡 코드 없음 — 실행 스킵")
+        return {**state, "execution_result": None}
     print("🐳 Docker 샌드박스 실행 중...")
     result = execute_code(state["code_result"])
     return {**state, "execution_result": result}
 
 def error_analysis_node(state: AgentState) -> AgentState:
-    print(f"⚠️  에러 분석 중... (재시도 {state['retry_count'] + 1}/3)")
-    fixed_code = run_error_analysis(
+    retry = state["retry_count"] + 1
+    print(f"⚠️  에러 분석 중... (재시도 {retry}/3)")
+
+    fixed_code, analysis_text = run_error_analysis(
         code=state["code_result"],
         error=state["execution_result"].get("error", ""),
         user_input=state["user_input"]
     )
+
     return {
         **state,
         "code_result": fixed_code,
-        "retry_count": state["retry_count"] + 1
+        "retry_count": retry,
+        "error_analysis": analysis_text,
+    }
+
+    # 에러 분석 결과 저장
+    error_analysis = getattr(builtins, "_last_error_analysis", "")
+
+    return {
+        **state,
+        "code_result": fixed_code,
+        "retry_count": retry,
+        "error": error_analysis,
     }
 
 def output_node(state: AgentState) -> AgentState:
@@ -99,9 +158,12 @@ def check_human_approval(state: AgentState) -> str:
         return "human_approval"
 
 def check_execution(state: AgentState) -> str:
-    if state["execution_result"]["success"]:
+    exec_result = state.get("execution_result")
+    if exec_result is None:
         return "output"
-    elif state["retry_count"] >= 3:
+    if exec_result.get("success"):
+        return "output"
+    elif state.get("retry_count", 0) >= 3:
         return "output"
     else:
         return "error_analysis"
@@ -149,7 +211,6 @@ def build_graph(session_id: str = "default"):
 
 
 def build_phase1_graph():
-    """1단계: 리서치 → 코드 생성 → 코드 리뷰"""
     checkpointer = _get_checkpointer()
     graph = StateGraph(AgentState)
 
@@ -157,15 +218,17 @@ def build_phase1_graph():
     graph.add_node("code_decision", code_decision_node)
     graph.add_node("code_generation", code_generation_node)
     graph.add_node("code_review", code_review_node)
+    graph.add_node("output", output_node)
 
     graph.set_entry_point("research")
     graph.add_edge("research", "code_decision")
     graph.add_conditional_edges("code_decision", should_generate_code, {
         "code_generation": "code_generation",
-        "output": END
+        "output": "output"
     })
     graph.add_edge("code_generation", "code_review")
     graph.add_edge("code_review", END)
+    graph.add_edge("output", END)
 
     return graph.compile(checkpointer=checkpointer)
 

@@ -13,6 +13,8 @@ services:
     depends_on:
       - ollama
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Seoul
 
   ollama:
     image: ollama/ollama:latest

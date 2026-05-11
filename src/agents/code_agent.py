@@ -32,20 +32,20 @@ def run_code_generation(user_input: str, research_result: str) -> str:
     llm = _get_ollama_coder()
 
     prompt = f"""
-다음 요청에 맞는 코드를 작성해주세요.
+    다음 요청에 맞는 코드를 작성해주세요.
 
-## 사용자 요청
-{user_input}
+    ## 사용자 요청
+    {user_input}
 
-## 리서치 결과 (참고용)
-{research_result}
+    ## 리서치 결과 (참고용)
+    {research_result}
 
-## 요구사항
-- 실행 가능한 완성된 코드만 작성
-- 주석 포함
-- 코드 블록 없이 순수 코드만 출력
-- Python으로 작성
-"""
+    ## 요구사항
+    - 실행 가능한 완성된 코드만 작성
+    - 주석 포함
+    - 코드 블록 없이 순수 코드만 출력
+    - Python으로 작성
+    """
 
     response = llm.invoke([HumanMessage(content=prompt)])
 
@@ -65,23 +65,23 @@ def run_code_review(code: str, user_input: str) -> str:
     llm = _get_ollama_coder()
 
     prompt = f"""
-다음 코드를 리뷰해주세요.
+    다음 코드를 리뷰해주세요.
 
-## 사용자 의도
-{user_input}
+    ## 사용자 의도
+    {user_input}
 
-## 코드
-{code}
+    ## 코드
+    {code}
 
-## 검토 항목
-1. 사용자 의도와 코드가 일치하는가?
-2. 문법 오류가 있는가?
-3. 보안 문제가 있는가?
-4. 로직 오류가 있는가?
+    ## 검토 항목
+    1. 사용자 의도와 코드가 일치하는가?
+    2. 문법 오류가 있는가?
+    3. 보안 문제가 있는가?
+    4. 로직 오류가 있는가?
 
-문제가 있으면 수정된 코드를, 없으면 원본 코드를 그대로 반환하세요.
-코드만 반환하고 설명은 제외하세요.
-"""
+    문제가 있으면 수정된 코드를, 없으면 원본 코드를 그대로 반환하세요.
+    코드만 반환하고 설명은 제외하세요.
+    """
 
     response = llm.invoke([HumanMessage(content=prompt)])
 
@@ -95,50 +95,50 @@ def run_code_review(code: str, user_input: str) -> str:
 
     return response.content.strip()
 
-def run_error_analysis(code: str, error: str, user_input: str) -> str:
+def run_error_analysis(code: str, error: str, user_input: str) -> tuple:
     pipeline_logger.log_step("Error Analysis", "running", input_data=error)
 
-    # Gemma로 에러 분석
+    from sandbox.error_parser import format_error_for_agent
+
     gemma = _get_ollama_gemma()
+    formatted_error = format_error_for_agent(error)
 
     analysis_prompt = f"""
-다음 코드 실행 중 에러가 발생했습니다.
+    다음 코드 실행 중 에러가 발생했습니다.
 
-## 코드
-{code}
+    ## 에러
+    {formatted_error}
 
-## 에러 메시지
-{error}
-
-에러 원인을 분석하고 수정 방법을 간단히 설명해주세요. (3줄 이내)
-"""
+    에러 원인과 수정 방법을 아래 형식으로 설명하세요.
+    원인: (에러 원인 한 줄)
+    수정: (수정 방법 한 줄)"""
     analysis = gemma.invoke([HumanMessage(content=analysis_prompt)])
+    analysis_text = analysis.content.strip()
+    print(f"📋 에러 분석:\n{analysis_text}")
 
     pipeline_logger.log_llm(
         model="gemma3:4b",
         prompt=analysis_prompt,
-        response=analysis.content,
+        response=analysis_text,
         tokens=0
     )
 
-    # qwen2.5-coder로 수정 코드 생성
     coder = _get_ollama_coder()
     fix_prompt = f"""
-다음 코드의 에러를 수정해주세요.
+    다음 코드의 에러를 수정해주세요.
 
-## 사용자 요청
-{user_input}
+    ## 사용자 요청
+    {user_input}
 
-## 기존 코드
-{code}
+    ## 기존 코드
+    {code}
 
-## 에러 분석
-{analysis.content}
+    ## 에러 분석
+    {analysis_text}
 
-수정된 완성 코드만 반환하세요. 설명 없이 코드만 출력하세요.
-"""
+    수정된 완성 코드만 반환하세요. 코드 블록 없이 순수 코드만 출력하세요.
+    """
     fixed = coder.invoke([HumanMessage(content=fix_prompt)])
-
     pipeline_logger.log_step("Error Analysis", "done", output_data=fixed.content)
 
-    return fixed.content.strip()
+    return fixed.content.strip(), analysis_text

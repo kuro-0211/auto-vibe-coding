@@ -16,14 +16,14 @@ def run_output(state: dict) -> str:
 
     research = state.get("research_result", "")
     code = state.get("code_result", "")
-    execution = state.get("execution_result", {})
+    execution = state.get("execution_result")
     retry_count = state.get("retry_count", 0)
 
-    if execution:
+    if execution and isinstance(execution, dict):
         if execution.get("success"):
-            exec_summary = f"✅ 실행 성공\n{execution.get('output', '')}"
+            exec_summary = f"실행 성공\n{execution.get('output', '')}"
         else:
-            exec_summary = f"❌ 실행 실패 ({retry_count}회 시도)\n{execution.get('error', '')}"
+            exec_summary = f"실행 실패 ({retry_count}회 시도)\n{execution.get('error', '')}"
     else:
         exec_summary = "코드 실행 없음"
 
