@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv("/app/.env")
 from openai import OpenAI
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage

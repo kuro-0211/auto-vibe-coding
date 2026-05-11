@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, "/app/src")
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import TypedDict, Optional
