@@ -49,25 +49,33 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 
 ## 🏗️ 시스템 아키텍처
 
-상세 아키텍처 다이어그램은 [`architecture/`](./architecture/) 폴더를 참고하세요.
+<p align="center">
+  <img src="./architecture/aria_animated.svg" alt="ARIA 파이프라인 애니메이션" width="100%">
+</p>
+
+> 💡 파란 점이 파이프라인을 따라 흐르며 데이터 전송을 표현합니다. 분홍 펄스는 HITL 편집 단계, 빨간 점선은 Self-Correction 회귀 경로입니다. (GitHub의 SVG 렌더러는 SMIL 애니메이션을 그대로 재생합니다.)
+
+상세 다이어그램은 [`architecture/`](./architecture/) 폴더를 참고하세요.
 
 ### 파이프라인 흐름
 
 ```
-사용자 입력 (키워드/목적)
+사용자 입력 (키워드/목적 · 이메일 첨부 형식 선택)
     ↓
 ① Research Agent   — Tavily 웹 검색 + GPT-5.4 정리 (출처 URL 포함)
     ↓
 ② Code Decision    — GPT-5.4가 코드 생성 필요 여부 판단
     ↓ (코드 필요 시)
 ③ Code Agent       — qwen2.5-coder 코드 생성 + 코드 리뷰
-                       → 사용자 승인 (Human-in-the-Loop)
-                       → Docker 샌드박스 실행
-                       → 실패 시 Gemma 에러 분석 → 재생성 (최대 3회)
+                       → ✏️ HITL: 사용자가 코드 직접 편집 가능 (text_area)
+                       → 승인 후 Docker 샌드박스 실행
+                       → 실패 시 gemma3:4b 에러 분석 → 재생성 (최대 3회)
     ↓
 ④ Output Agent     — gemma3:4b 문서 정리 + 결과 출력
     ↓
-⑤ Email Agent      — 요청 시에만 발송 (네이버 SMTP)
+⑤ 파일 변환        — PDF (fpdf2 + NanumGothic) / Word (python-docx) / Markdown
+    ↓
+⑥ Email Agent      — 요청 시에만 발송 (네이버 SMTP, 본문 + 선택 형식 첨부)
 ```
 
 ---
@@ -183,6 +191,7 @@ aria/
 ├── ISSUES.md
 ├── CHANGELOG.md
 ├── architecture/
+│   ├── aria_animated.svg              ← SMIL 애니메이션 (README 임베드)
 │   ├── architecture.mermaid
 │   ├── architecture_ai.mermaid
 │   ├── architecture_dashboard.mermaid
@@ -285,10 +294,11 @@ http://localhost:8501
 | Self-Correction Loop | ✅ 완료 |
 | Human-in-the-Loop | ✅ 완료 |
 | LangGraph Checkpointer | ✅ 완료 |
-| HITL 고도화 (코드 수정 개입) | 🚧 개발 예정 |
+| HITL 고도화 (코드 수정 개입) | ✅ 완료 |
+| 파일 형식 출력 (PDF/Word/Markdown) | ✅ 완료 |
+| 이메일 파일 첨부 (네이버 SMTP) | ✅ 완료 |
 | Neo4j 기반 장기 기억 | 🚧 개발 예정 |
 | 멀티스텝 프로젝트 관리 | 🚧 개발 예정 |
-| 파일 형식 출력 (PDF/Word) | 📋 계획 중 |
 | 스케줄링 자동 실행 | 📋 계획 중 |
 
 ---

@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 400" font-family="system-ui,-apple-system,'Segoe UI',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <style>
+    .label    { font-size:13px; font-weight:700; fill:#0f172a; text-anchor:middle; }
+    .sub      { font-size:10px; font-weight:500; text-anchor:middle; }
+    .phase    { font-size:12px; font-weight:700; fill:#475569; letter-spacing:0.06em; }
+    .flow     { stroke:#94a3b8; stroke-width:2; fill:none; stroke-dasharray:6 6; }
+    .branch   { stroke:#cbd5e1; stroke-width:2; fill:none; stroke-dasharray:4 5; }
+    .node     { stroke-width:2; rx:10; ry:10; filter:url(#soft); }
+  </style>
+
+  <rect width="1100" height="400" fill="#f8fafc"/>
+
+  <text x="20" y="28" class="phase">■ PHASE 1 — RESEARCH &amp; CODE REVIEW</text>
+  <text x="20" y="226" class="phase">■ PHASE 2 — EXECUTE &amp; DELIVER</text>
+
+  <!-- ========== 흐름 라인 (애니메이션 점선) ========== -->
+  <!-- Phase 1 단계 라인 -->
+  <line class="flow" x1="160" y1="95"  x2="190" y2="95">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="330" y1="95"  x2="360" y2="95">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.1s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="500" y1="95"  x2="530" y2="95">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.2s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="670" y1="95"  x2="700" y2="95">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.3s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="840" y1="95"  x2="870" y2="95">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.4s" repeatCount="indefinite"/>
+  </line>
+
+  <!-- Phase 1 → Phase 2 전환 곡선 (HITL → Execute) -->
+  <path class="flow" d="M 940,130 C 940,200 190,180 190,240">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="1.2s" begin="0.5s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Decision → Output 분기 (코드 불필요 경로) -->
+  <path class="branch" d="M 430,130 C 430,180 470,200 470,240">
+    <animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.5s" begin="0.3s" repeatCount="indefinite"/>
+  </path>
+  <text x="500" y="190" class="sub" fill="#64748b">코드 불필요</text>
+
+  <!-- Phase 2 단계 라인 -->
+  <line class="flow" x1="260" y1="275" x2="400" y2="275">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.7s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="540" y1="275" x2="680" y2="275">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.8s" repeatCount="indefinite"/>
+  </line>
+  <line class="flow" x1="820" y1="275" x2="900" y2="275">
+    <animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.9s" begin="0.9s" repeatCount="indefinite"/>
+  </line>
+
+  <!-- Self-correction 회귀선 (Execute → CodeGen, 실패 시) -->
+  <path class="branch" d="M 190,240 C 100,180 100,150 530,95" stroke="#fca5a5" stroke-dasharray="3 4">
+    <animate attributeName="stroke-dashoffset" from="0" to="-21" dur="1.4s" repeatCount="indefinite"/>
+  </path>
+  <text x="70" y="170" class="sub" fill="#dc2626">↺ 에러 분석 (≤3회)</text>
+
+  <!-- ========== 신호 펄스 (라인 위 움직이는 점) ========== -->
+  <circle r="4" fill="#3b82f6">
+    <animateMotion dur="6s" repeatCount="indefinite"
+      path="M 20,95 H 1010 C 1080,150 240,180 190,240 H 1040"/>
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="6s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- ========== 노드 (Phase 1) ========== -->
+  <!-- Input -->
+  <g>
+    <rect class="node" x="20"  y="60" width="140" height="70" fill="#dbeafe" stroke="#93c5fd"/>
+    <text x="90"  y="95"  class="label">🧑 사용자 입력</text>
+    <text x="90"  y="113" class="sub" fill="#1e3a5f">키워드 / 목적</text>
+  </g>
+
+  <!-- Research -->
+  <g>
+    <rect class="node" x="190" y="60" width="140" height="70" fill="#ede9fe" stroke="#c4b5fd"/>
+    <text x="260" y="95"  class="label">🔍 Research</text>
+    <text x="260" y="113" class="sub" fill="#3b0764">Tavily + GPT-5.4</text>
+  </g>
+
+  <!-- Decision -->
+  <g>
+    <rect class="node" x="360" y="60" width="140" height="70" fill="#fef3c7" stroke="#fcd34d"/>
+    <text x="430" y="95"  class="label">💡 Code Decision</text>
+    <text x="430" y="113" class="sub" fill="#78350f">GPT-5.4 판단</text>
+  </g>
+
+  <!-- Code Gen -->
+  <g>
+    <rect class="node" x="530" y="60" width="140" height="70" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="600" y="95"  class="label">🦙 Code Generation</text>
+    <text x="600" y="113" class="sub" fill="#7f1d1d">qwen2.5-coder</text>
+  </g>
+
+  <!-- Code Review -->
+  <g>
+    <rect class="node" x="700" y="60" width="140" height="70" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="770" y="95"  class="label">🔍 Code Review</text>
+    <text x="770" y="113" class="sub" fill="#7f1d1d">qwen2.5-coder</text>
+  </g>
+
+  <!-- HITL -->
+  <g>
+    <rect class="node" x="870" y="60" width="140" height="70" fill="#fce7f3" stroke="#f9a8d4"/>
+    <text x="940" y="95"  class="label">✏️ HITL 편집</text>
+    <text x="940" y="113" class="sub" fill="#831843">사용자 코드 수정</text>
+    <!-- HITL 강조 펄스 -->
+    <animate attributeName="stroke-width" values="2;4;2" dur="1.8s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- ========== 노드 (Phase 2) ========== -->
+  <!-- Execute -->
+  <g>
+    <rect class="node" x="120" y="240" width="140" height="70" fill="#e0f2fe" stroke="#7dd3fc"/>
+    <text x="190" y="275" class="label">🐳 Docker 실행</text>
+    <text x="190" y="293" class="sub" fill="#0c4a6e">60s · 1GB · network=none</text>
+  </g>
+
+  <!-- Output -->
+  <g>
+    <rect class="node" x="400" y="240" width="140" height="70" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="470" y="275" class="label">📄 Output Agent</text>
+    <text x="470" y="293" class="sub" fill="#7f1d1d">gemma3:4b</text>
+  </g>
+
+  <!-- Email + Export -->
+  <g>
+    <rect class="node" x="680" y="240" width="140" height="70" fill="#fef9c3" stroke="#fde047"/>
+    <text x="750" y="272" class="label">📎 PDF / Word / MD</text>
+    <text x="750" y="290" class="sub" fill="#713f12">fpdf2 · python-docx</text>
+    <text x="750" y="303" class="sub" fill="#713f12">+ 네이버 SMTP</text>
+  </g>
+
+  <!-- Result -->
+  <g>
+    <rect class="node" x="900" y="240" width="140" height="70" fill="#d1fae5" stroke="#6ee7b7"/>
+    <text x="970" y="275" class="label">✅ 최종 결과물</text>
+    <text x="970" y="293" class="sub" fill="#064e3b">다운로드 + 이메일</text>
+  </g>
+
+  <!-- 화살표 끝점 마커 (라인 끝에 직접 추가) -->
+  <line x1="185" y1="95"  x2="190" y2="95"  stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="355" y1="95"  x2="360" y2="95"  stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="525" y1="95"  x2="530" y2="95"  stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="695" y1="95"  x2="700" y2="95"  stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="865" y1="95"  x2="870" y2="95"  stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="395" y1="275" x2="400" y2="275" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="675" y1="275" x2="680" y2="275" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="895" y1="275" x2="900" y2="275" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- 하단 캡션 -->
+  <text x="550" y="365" class="sub" fill="#64748b" font-size="11">
+    파란 점이 파이프라인을 따라 흐릅니다 · 점선 흐름 = 데이터 전송 · 분홍 펄스 = HITL 대기 · 빨간 점선 = Self-Correction
+  </text>
+  <text x="550" y="382" class="sub" fill="#94a3b8" font-size="10">
+    ARIA — Automated Research &amp; Intelligence Agent
+  </text>
+</svg>
