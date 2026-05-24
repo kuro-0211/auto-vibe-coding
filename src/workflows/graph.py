@@ -24,6 +24,8 @@ class AgentState(TypedDict):
     retry_count: int
     needs_code: Optional[bool]
     human_approved: Optional[bool]
+    email_format: Optional[str]
+    edited_code: Optional[str]
 
 # ── 노드 함수 ──────────────────────────────────────────────
 def research_node(state: AgentState) -> AgentState:
@@ -99,6 +101,14 @@ def human_approval_node(state: AgentState) -> AgentState:
     print("⏳ 사용자 승인 대기 중...")
     return {**state, "human_approved": None}
 
+def human_review_node(state: AgentState) -> AgentState:
+    """HITL: 사용자가 편집한 코드(edited_code)를 최종 코드로 반영."""
+    edited = state.get("edited_code")
+    if edited and edited.strip():
+        print("✏️  사용자 편집 코드 적용")
+        return {**state, "code_result": edited, "edited_code": None}
+    return state
+
 def execution_node(state: AgentState) -> AgentState:
     if not state.get("code_result"):
         print("💡 코드 없음 — 실행 스킵")
@@ -141,7 +151,20 @@ def output_node(state: AgentState) -> AgentState:
 
 def email_node(state: AgentState) -> AgentState:
     print("📧 이메일 발송 중...")
-    run_email(state["final_output"])
+    fmt = state.get("email_format")
+    attachments = []
+    if fmt and fmt != "none":
+        try:
+            from agents.output_agent import save_output_file
+            path = save_output_file(
+                content=state["final_output"] or "",
+                code=state.get("code_result") or "",
+                fmt=fmt,
+            )
+            attachments.append(path)
+        except Exception as e:
+            print(f"⚠️ 첨부파일 생성 실패: {e}")
+    run_email(state["final_output"], attachments=attachments)
     return state
 
 # ── 분기 조건 ──────────────────────────────────────────────
@@ -211,6 +234,11 @@ def build_graph(session_id: str = "default"):
 
 
 def build_phase1_graph():
+    """1단계: research → code_decision → (code_generation → code_review → human_review) | output.
+
+    human_review 노드는 dashboard의 코드 편집 텍스트 에어리어를 통해 사용자가
+    수정한 코드를 반영한다. edited_code가 비어있으면 리뷰된 코드를 그대로 사용한다.
+    """
     checkpointer = _get_checkpointer()
     graph = StateGraph(AgentState)
 
@@ -218,6 +246,7 @@ def build_phase1_graph():
     graph.add_node("code_decision", code_decision_node)
     graph.add_node("code_generation", code_generation_node)
     graph.add_node("code_review", code_review_node)
+    graph.add_node("human_review", human_review_node)
     graph.add_node("output", output_node)
 
     graph.set_entry_point("research")
@@ -227,7 +256,8 @@ def build_phase1_graph():
         "output": "output"
     })
     graph.add_edge("code_generation", "code_review")
-    graph.add_edge("code_review", END)
+    graph.add_edge("code_review", "human_review")
+    graph.add_edge("human_review", END)
     graph.add_edge("output", END)
 
     return graph.compile(checkpointer=checkpointer)

@@ -1,12 +1,18 @@
 flowchart LR
-    G["✨ Gemini 2.5 Flash\n───────────────\n리서치 정리\n문서 작성\n에러 분석\n(무료 티어 일 20회)"]:::gemini
-    P["🤖 GPT-5.4-mini\n───────────────\n코드 리뷰\n의도 검증\n(학교 API · 토큰 최소화)"]:::gpt
-    O["🦙 Ollama  RTX 3080\n───────────────\nqwen2.5-coder\n코드 생성 / 수정\n(로컬 · 무료)"]:::ollama
+    P["🤖 GPT-5.4-mini\n(학교 API)\n───────────────\n· 리서치 결과 정리\n  (research_agent)\n· 코드 필요 판단\n  (code_decision_node)\n· 학교 API · 토큰 최소화"]:::gpt
 
-    G -- "에러 분석 결과 전달" --> O
-    P -- "리뷰 통과 / 재작성 요청" --> O
-    G -. "리서치 컨텍스트 공유" .-> P
+    O_CODER["🦙 Ollama qwen2.5-coder\n(RTX 3080 · 로컬)\n───────────────\n· 코드 생성\n  (run_code_generation)\n· 코드 리뷰\n  (run_code_review)\n· 에러 수정\n  (run_error_analysis)"]:::ollama
 
-    classDef gemini    fill:#fef9c3,stroke:#fde047,color:#713f12
-    classDef gpt       fill:#dcfce7,stroke:#86efac,color:#14532d
-    classDef ollama    fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    O_GEMMA["🦙 Ollama gemma3:4b\n(RTX 3080 · 로컬)\n───────────────\n· 에러 원인 분석\n  (run_error_analysis)\n· 최종 결과 문서화\n  (run_output)"]:::ollama
+
+    USER["✏️ 사용자 (HITL)\n───────────────\n코드 리뷰 후\n직접 수정 가능\n(text_area)"]:::user
+
+    P -- "리서치 컨텍스트 전달" --> O_CODER
+    O_CODER -- "코드 결과" --> USER
+    USER -- "edited_code" --> O_CODER
+    O_GEMMA -- "에러 분석 결과" --> O_CODER
+    O_CODER -- "최종 코드 + 실행 결과" --> O_GEMMA
+
+    classDef gpt    fill:#dcfce7,stroke:#86efac,color:#14532d
+    classDef ollama fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
+    classDef user   fill:#fce7f3,stroke:#f9a8d4,color:#831843,font-weight:bold

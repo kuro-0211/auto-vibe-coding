@@ -1,12 +1,33 @@
 flowchart LR
     subgraph DASH["🖥️ Streamlit 대시보드 (localhost:8501)"]
-        direction LR
-        T1["🚀 실행 탭\n───────────────\n키워드/목적 입력\n파이프라인 단계별\n실시간 진행 표시"]:::app
-        T2["📊 모니터링 탭\n───────────────\n각 에이전트\n단계별 입출력 확인"]:::app
-        T3["📝 로그 탭\n───────────────\nLLM 호출 내역\n토큰 사용량 확인"]:::app
+        direction TB
+
+        subgraph T1["🚀 실행 탭"]
+            direction TB
+            IN["키워드/목적 입력\n📧 이메일 발송 체크\n📎 첨부 형식 선택\n  (pdf / docx / md / none)"]:::input
+            STEPS["파이프라인 단계 표시\n────────────────\n🔍 Research\n💡 Code Decision\n🦙 Code Generation\n🔍 Code Review\n✏️ 사용자 편집 (HITL)\n🐳 Docker 실행\n⚠️ 에러 분석\n📄 결과 정리\n📧 이메일 발송"]:::steps
+            HITL["✏️ 코드 편집 텍스트 에어리어\n────────────────\n[승인 — 실행]\n[원본 복원]\n[거절 — 처음부터]"]:::hitl
+            RESULT["📄 결과 출력\n────────────────\n[PDF 다운로드]\n[Word 다운로드]\n[Markdown 다운로드]"]:::result
+            IN --> STEPS --> HITL --> RESULT
+        end
+
+        T2["📊 모니터링 탭\n────────────────\n에이전트 단계별\n입출력 흐름\n로그 카드 표시"]:::app
+        T3["📝 로그 탭\n────────────────\nLLM 호출 내역\n프롬프트 / 응답\n토큰 사용량"]:::app
     end
 
-    T1 -. "실행 후 데이터 공유" .-> T2
-    T1 -. "실행 후 데이터 공유" .-> T3
+    SESSION["💾 세션 상태\n────────────────\nsession_id (UUID)\nphase (idle/p1/done/p2)\nstep_status\nagent_logs"]:::state
 
-    classDef app fill:#f8fafc,stroke:#94a3b8,color:#1e293b
+    CKPT["🗄️ SQLite Checkpointer\ndata/checkpoints.db\n(LangGraph 상태 영속화)"]:::store
+
+    T1 -. "session_state" .-> SESSION
+    T1 -. "실행 결과 공유" .-> T2
+    T1 -. "실행 결과 공유" .-> T3
+    SESSION -. "thread_id" .-> CKPT
+
+    classDef app    fill:#f8fafc,stroke:#94a3b8,color:#1e293b
+    classDef input  fill:#dbeafe,stroke:#93c5fd,color:#1e3a5f
+    classDef steps  fill:#fef9c3,stroke:#fde047,color:#713f12
+    classDef hitl   fill:#fce7f3,stroke:#f9a8d4,color:#831843,font-weight:bold
+    classDef result fill:#d1fae5,stroke:#6ee7b7,color:#064e3b
+    classDef state  fill:#ede9fe,stroke:#c4b5fd,color:#3b0764
+    classDef store  fill:#e0f2fe,stroke:#7dd3fc,color:#0c4a6e

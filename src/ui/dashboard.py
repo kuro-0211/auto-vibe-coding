@@ -8,6 +8,7 @@ import uuid
 import time
 from dotenv import load_dotenv
 from workflows.graph import build_phase1_graph, build_phase2_graph
+from agents.output_agent import export_to_pdf, export_to_docx
 from utils.logger import pipeline_logger
 
 load_dotenv("/app/.env")
@@ -94,6 +95,7 @@ ALL_STEPS = [
     ("code_decision",   "💡", "코드 필요 여부"),
     ("code_generation", "🦙", "코드 생성"),
     ("code_review",     "🔍", "코드 리뷰"),
+    ("human_review",    "✏️", "사용자 편집"),
     ("execution",       "🐳", "Docker 실행"),
     ("error_analysis",  "⚠️", "에러 분석"),
     ("output",          "📄", "결과 정리"),
@@ -106,6 +108,7 @@ defaults = {
     "phase1_result": None,
     "result": None,
     "send_email": False,
+    "email_format": "pdf",
     "agent_logs": [],
     "step_status": {},
     "user_input": "",
@@ -188,6 +191,15 @@ if st.session_state.current_page == "run":
                 height=120
             )
             send_email = st.checkbox("📧  이메일로 받기")
+            email_format = st.selectbox(
+                "첨부 파일 형식",
+                options=["pdf", "docx", "md", "none"],
+                format_func=lambda x: {
+                    "pdf": "📄 PDF", "docx": "📝 Word",
+                    "md": "📋 Markdown", "none": "🚫 첨부 없음"
+                }[x],
+                index=0,
+            )
             submitted = st.form_submit_button("▶  실행", use_container_width=True, type="primary")
 
         if submitted and user_input.strip():
@@ -197,6 +209,7 @@ if st.session_state.current_page == "run":
             st.session_state.phase1_result = None
             st.session_state.result = None
             st.session_state.send_email = send_email
+            st.session_state.email_format = email_format
             st.session_state.agent_logs = []
             st.session_state.step_status = {}
             st.session_state.user_input = user_input
@@ -240,10 +253,12 @@ if st.session_state.current_page == "run":
             initial_state = {
                 "user_input": st.session_state.user_input,
                 "send_email": st.session_state.send_email,
+                "email_format": st.session_state.email_format,
                 "research_result": None, "code_result": None,
                 "execution_result": None, "final_output": None,
                 "error": None, "error_analysis": None,
                 "retry_count": 0, "needs_code": None,
+                "edited_code": None,
             }
             config = {"configurable": {"thread_id": st.session_state.session_id}}
             try:
@@ -315,25 +330,33 @@ if st.session_state.current_page == "run":
                 ), unsafe_allow_html=True)
 
             if result.get("code_result"):
-                safe_code = html_lib.escape(result['code_result'][:300])
-                st.markdown(card_html("생성된 코드", "리뷰 완료", "green",
-                    f"<pre style='background:#f0f0f5;border-radius:8px;padding:12px;font-size:12px;color:#1d1d1f;line-height:1.6;margin:0;overflow:auto;'>{safe_code}</pre>",
-                    "🦙"
-                ), unsafe_allow_html=True)
-
                 st.html("""
                 <div style="background:#fde8c0;border:1.5px solid rgba(255,159,10,0.35);border-radius:12px;
                 padding:14px 16px;margin-bottom:12px;">
-                    <div style="font-size:13px;font-weight:600;color:#6b3f00;margin-bottom:3px;">⏳ 코드 실행 전 승인이 필요합니다</div>
-                    <div style="font-size:12px;color:#6b3f00;opacity:0.8;">리뷰된 코드를 확인하고 실행을 승인해주세요.</div>
+                    <div style="font-size:13px;font-weight:600;color:#6b3f00;margin-bottom:3px;">✏️ 코드 검토 및 수정</div>
+                    <div style="font-size:12px;color:#6b3f00;opacity:0.8;">리뷰된 코드를 직접 편집할 수 있습니다. 수정 후 승인하면 편집한 코드로 실행됩니다.</div>
                 </div>
                 """)
-                col1, col2 = st.columns(2)
+
+                edited_code = st.text_area(
+                    "코드 편집",
+                    value=result["code_result"],
+                    height=320,
+                    key="code_editor",
+                )
+
+                col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
-                    if st.button("✅  승인 — 코드 실행", use_container_width=True, type="primary"):
+                    if st.button("✅  승인 — 실행", use_container_width=True, type="primary"):
+                        st.session_state.phase1_result["code_result"] = edited_code
+                        st.session_state.phase1_result["edited_code"] = None
                         st.session_state.phase = "running_phase2"
                         st.rerun()
                 with col2:
+                    if st.button("🔄  원본 복원", use_container_width=True):
+                        st.session_state.pop("code_editor", None)
+                        st.rerun()
+                with col3:
                     if st.button("❌  거절 — 처음부터", use_container_width=True):
                         st.session_state.phase = "idle"
                         st.session_state.phase1_result = None
@@ -461,6 +484,43 @@ if st.session_state.current_page == "run":
             if result.get("research_result"):
                 with st.expander("🔍  리서치 결과", expanded=False):
                     st.markdown(result["research_result"])
+
+            # ── 다운로드 버튼 ────────────────────────────────
+            if result.get("final_output"):
+                st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
+                st.html("<div style='font-size:10px;font-weight:700;color:#aeaeb2;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;'>결과 다운로드</div>")
+                dl_col1, dl_col2, dl_col3 = st.columns(3)
+                final_text = result["final_output"]
+                code_text = result.get("code_result", "") or ""
+                try:
+                    pdf_bytes = export_to_pdf(final_text, code_text)
+                    docx_bytes = export_to_docx(final_text, code_text)
+                    with dl_col1:
+                        st.download_button(
+                            "📄  PDF 다운로드",
+                            data=pdf_bytes,
+                            file_name="aria_result.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                        )
+                    with dl_col2:
+                        st.download_button(
+                            "📝  Word 다운로드",
+                            data=docx_bytes,
+                            file_name="aria_result.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                        )
+                    with dl_col3:
+                        st.download_button(
+                            "📋  Markdown",
+                            data=final_text.encode("utf-8"),
+                            file_name="aria_result.md",
+                            mime="text/markdown",
+                            use_container_width=True,
+                        )
+                except Exception as e:
+                    st.error(f"파일 생성 실패: {e}")
 
             st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
             if st.button("🔄  새로 시작", use_container_width=True):
