@@ -9,6 +9,7 @@ import time
 from dotenv import load_dotenv
 from workflows.graph import build_phase1_graph, build_phase2_graph
 from agents.output_agent import export_to_pdf, export_to_docx
+from utils.history import list_history, get_history, clear_history
 from utils.logger import pipeline_logger
 
 load_dotenv("/app/.env")
@@ -138,7 +139,7 @@ with st.sidebar:
     </div>
     """)
 
-    for page_id, icon, label in [("run","🚀","실행"),("monitor","📊","모니터링"),("log","📝","로그")]:
+    for page_id, icon, label in [("run","🚀","실행"),("monitor","📊","모니터링"),("log","📝","로그"),("history","🕒","히스토리")]:
         is_active = st.session_state.current_page == page_id
         if st.button(f"{icon}  {label}", key=f"nav_{page_id}", use_container_width=True,
                      type="primary" if is_active else "secondary"):
@@ -166,7 +167,7 @@ phase_labels = {
     "idle": "대기 중", "running_phase1": "Phase 1 실행 중",
     "phase1_done": "승인 대기", "running_phase2": "Phase 2 실행 중", "phase2_done": "완료",
 }
-page_titles = {"run": "실행", "monitor": "모니터링", "log": "로그"}
+page_titles = {"run": "실행", "monitor": "모니터링", "log": "로그", "history": "히스토리"}
 
 st.html(f"""
 <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 20px;
@@ -259,6 +260,7 @@ if st.session_state.current_page == "run":
                 "error": None, "error_analysis": None,
                 "retry_count": 0, "needs_code": None,
                 "edited_code": None,
+                "start_time": st.session_state.start_time,
             }
             config = {"configurable": {"thread_id": st.session_state.session_id}}
             try:
@@ -600,5 +602,120 @@ elif st.session_state.current_page == "log":
                 st.text(log["prompt"])
                 st.markdown("**응답**")
                 st.text(log["response"])
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════
+# 히스토리 페이지
+# ══════════════════════════════════════════════════════════
+elif st.session_state.current_page == "history":
+    st.markdown("<div style='padding:16px;'>", unsafe_allow_html=True)
+
+    items = list_history(limit=200)
+
+    top_col1, top_col2, top_col3 = st.columns(3)
+    with top_col1:
+        st.metric("전체 실행", f"{len(items)}건")
+    with top_col2:
+        success_count = sum(1 for i in items if i["success"])
+        st.metric("성공", f"{success_count}건")
+    with top_col3:
+        fail_count = len(items) - success_count
+        st.metric("실패", f"{fail_count}건")
+
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
+
+    # 전체 삭제 (2단계 확인)
+    if st.session_state.get("confirm_clear_history"):
+        st.warning("⚠️ 모든 히스토리를 영구 삭제합니다. 정말 진행하시겠습니까?")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅  네, 삭제합니다", use_container_width=True, type="primary"):
+                deleted = clear_history()
+                st.session_state.confirm_clear_history = False
+                st.success(f"{deleted}건의 히스토리를 삭제했습니다.")
+                st.rerun()
+        with c2:
+            if st.button("❌  취소", use_container_width=True):
+                st.session_state.confirm_clear_history = False
+                st.rerun()
+    else:
+        if items and st.button("🗑️  히스토리 전체 삭제", use_container_width=False):
+            st.session_state.confirm_clear_history = True
+            st.rerun()
+
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
+
+    if not items:
+        st.html("""
+        <div style="background:#fff;border:1.5px solid rgba(0,0,0,0.15);border-radius:12px;
+        padding:56px 16px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:14px;">🕒</div>
+            <div style="font-size:15px;font-weight:600;color:#1d1d1f;margin-bottom:6px;">아직 저장된 히스토리가 없습니다</div>
+            <div style="font-size:13px;color:#6e6e73;">실행 탭에서 파이프라인을 한 번 돌려보세요.</div>
+        </div>
+        """)
+    else:
+        for item in items:
+            badge_bg, badge_color = (("#d4edda", "#1a5e2a") if item["success"] else ("#ffd5d5", "#7a1515"))
+            badge_label = "✅ 성공" if item["success"] else "❌ 실패"
+            preview = (item["user_input"] or "")[:30]
+            if len(item["user_input"] or "") > 30:
+                preview += "…"
+            elapsed_str = f"{item['elapsed_sec']}s" if item["elapsed_sec"] is not None else "—"
+            # ISO datetime → 보기 좋게
+            created = item["created_at"].replace("T", " ")
+
+            header = f"[{created}]  {preview}  ·  ⏱ {elapsed_str}  ·  {badge_label}"
+
+            with st.expander(header, expanded=False):
+                detail = get_history(item["id"])
+                if not detail:
+                    st.info("상세 정보를 찾을 수 없습니다.")
+                    continue
+
+                st.markdown(f"**입력 내용**")
+                st.markdown(f"> {detail.get('user_input', '')}")
+
+                if detail.get("retry_count"):
+                    st.caption(f"재시도 횟수: {detail['retry_count']}회")
+
+                tabs = st.tabs(["📄 최종 결과", "🔍 리서치", "💻 코드", "🐳 실행 결과", "⚠️ 에러 분석"])
+
+                with tabs[0]:
+                    if detail.get("final_output"):
+                        st.markdown(detail["final_output"])
+                    else:
+                        st.caption("최종 결과 없음")
+
+                with tabs[1]:
+                    if detail.get("research_result"):
+                        st.markdown(detail["research_result"])
+                    else:
+                        st.caption("리서치 결과 없음")
+
+                with tabs[2]:
+                    if detail.get("code_result"):
+                        st.code(detail["code_result"], language="python")
+                    else:
+                        st.caption("코드 없음")
+
+                with tabs[3]:
+                    exec_r = detail.get("execution_result")
+                    if exec_r and isinstance(exec_r, dict):
+                        if exec_r.get("success"):
+                            st.success(f"실행 성공 · {exec_r.get('elapsed', 0)}s · {exec_r.get('lines', 0)}줄")
+                            st.code(exec_r.get("output", ""), language="text")
+                        else:
+                            st.error("실행 실패")
+                            st.code(exec_r.get("error", ""), language="text")
+                    else:
+                        st.caption("실행 결과 없음")
+
+                with tabs[4]:
+                    if detail.get("error_analysis"):
+                        st.markdown(detail["error_analysis"])
+                    else:
+                        st.caption("에러 분석 없음")
 
     st.markdown("</div>", unsafe_allow_html=True)

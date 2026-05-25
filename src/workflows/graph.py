@@ -26,6 +26,7 @@ class AgentState(TypedDict):
     human_approved: Optional[bool]
     email_format: Optional[str]
     edited_code: Optional[str]
+    start_time: Optional[float]
 
 # ── 노드 함수 ──────────────────────────────────────────────
 def research_node(state: AgentState) -> AgentState:
@@ -147,7 +148,22 @@ def error_analysis_node(state: AgentState) -> AgentState:
 def output_node(state: AgentState) -> AgentState:
     print("📄 Output Agent 결과 정리 중...")
     output = run_output(state)
-    return {**state, "final_output": output}
+    new_state = {**state, "final_output": output}
+
+    # Phase 종료 시점에 실행 히스토리 저장 (실패해도 파이프라인은 진행)
+    try:
+        import time
+        from utils.history import save_run_from_state
+        elapsed = None
+        start = state.get("start_time")
+        if start:
+            elapsed = int(time.time() - start)
+        save_run_from_state(new_state, elapsed_sec=elapsed)
+        print("🕒 실행 히스토리 저장 완료")
+    except Exception as e:
+        print(f"⚠️ 히스토리 저장 실패: {e}")
+
+    return new_state
 
 def email_node(state: AgentState) -> AgentState:
     print("📧 이메일 발송 중...")
