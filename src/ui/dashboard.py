@@ -11,6 +11,10 @@ from workflows.graph import build_phase1_graph, build_phase2_graph
 from agents.output_agent import export_to_pdf, export_to_docx
 from utils.history import list_history, get_history, clear_history
 from utils.logger import pipeline_logger
+from utils import scheduler as sched_mod
+
+# 백그라운드 스케줄러 부팅 (모듈 1회 초기화)
+sched_mod.init_scheduler()
 
 load_dotenv("/app/.env")
 
@@ -139,7 +143,7 @@ with st.sidebar:
     </div>
     """)
 
-    for page_id, icon, label in [("run","🚀","실행"),("monitor","📊","모니터링"),("log","📝","로그"),("history","🕒","히스토리")]:
+    for page_id, icon, label in [("run","🚀","실행"),("monitor","📊","모니터링"),("log","📝","로그"),("history","🕒","히스토리"),("schedule","⏰","스케줄")]:
         is_active = st.session_state.current_page == page_id
         if st.button(f"{icon}  {label}", key=f"nav_{page_id}", use_container_width=True,
                      type="primary" if is_active else "secondary"):
@@ -167,7 +171,7 @@ phase_labels = {
     "idle": "대기 중", "running_phase1": "Phase 1 실행 중",
     "phase1_done": "승인 대기", "running_phase2": "Phase 2 실행 중", "phase2_done": "완료",
 }
-page_titles = {"run": "실행", "monitor": "모니터링", "log": "로그", "history": "히스토리"}
+page_titles = {"run": "실행", "monitor": "모니터링", "log": "로그", "history": "히스토리", "schedule": "스케줄"}
 
 st.html(f"""
 <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 20px;
@@ -717,5 +721,191 @@ elif st.session_state.current_page == "history":
                         st.markdown(detail["error_analysis"])
                     else:
                         st.caption("에러 분석 없음")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════
+# 스케줄 페이지
+# ══════════════════════════════════════════════════════════
+elif st.session_state.current_page == "schedule":
+    st.markdown("<div style='padding:16px;'>", unsafe_allow_html=True)
+
+    DOW_LABELS = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+    FREQ_LABELS = {
+        "hourly": "매시간",
+        "daily":  "매일",
+        "weekly": "매주",
+        "monthly": "매월",
+    }
+    FMT_LABELS = {"pdf": "PDF", "docx": "Word", "none": "첨부 없음"}
+
+    sched_running = sched_mod.is_running()
+    top_c1, top_c2, top_c3 = st.columns(3)
+    all_scheds = sched_mod.list_schedules()
+    with top_c1:
+        st.metric("등록된 스케줄", f"{len(all_scheds)}건")
+    with top_c2:
+        active_n = sum(1 for s in all_scheds if s["enabled"])
+        st.metric("활성", f"{active_n}건")
+    with top_c3:
+        st.metric("스케줄러", "🟢 동작 중" if sched_running else "🔴 정지")
+
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
+
+    # ── 새 스케줄 등록 ────────────────────────────────────
+    st.html("<div style='font-size:13px;font-weight:700;color:#1d1d1f;margin-bottom:8px;'>➕ 새 스케줄 등록</div>")
+
+    with st.form("new_schedule_form", clear_on_submit=True):
+        s_input = st.text_area(
+            "키워드 / 목적",
+            placeholder="예: 오늘의 AI 뉴스 정리해줘",
+            height=80,
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            freq = st.selectbox("실행 주기", options=list(FREQ_LABELS.keys()),
+                                format_func=lambda k: FREQ_LABELS[k])
+        with c2:
+            email_format = st.selectbox(
+                "첨부 파일 형식",
+                options=["pdf", "docx", "none"],
+                format_func=lambda k: FMT_LABELS[k],
+                index=0,
+            )
+
+        # frequency별 추가 입력
+        hour = None
+        minute = 0
+        dow = None
+        day = None
+
+        if freq == "hourly":
+            minute = st.number_input("분 (매시 X분)", min_value=0, max_value=59, value=0, step=1)
+        elif freq == "daily":
+            tc1, tc2 = st.columns(2)
+            with tc1:
+                hour = st.number_input("시", min_value=0, max_value=23, value=9, step=1)
+            with tc2:
+                minute = st.number_input("분", min_value=0, max_value=59, value=0, step=1)
+        elif freq == "weekly":
+            wc1, wc2, wc3 = st.columns(3)
+            with wc1:
+                dow = st.selectbox("요일", options=list(range(7)),
+                                   format_func=lambda i: DOW_LABELS[i])
+            with wc2:
+                hour = st.number_input("시", min_value=0, max_value=23, value=9, step=1, key="w_hour")
+            with wc3:
+                minute = st.number_input("분", min_value=0, max_value=59, value=0, step=1, key="w_min")
+        elif freq == "monthly":
+            mc1, mc2, mc3 = st.columns(3)
+            with mc1:
+                day = st.number_input("일자", min_value=1, max_value=31, value=1, step=1)
+            with mc2:
+                hour = st.number_input("시", min_value=0, max_value=23, value=9, step=1, key="m_hour")
+            with mc3:
+                minute = st.number_input("분", min_value=0, max_value=59, value=0, step=1, key="m_min")
+
+        send_email = st.checkbox("📧 이메일 자동 발송")
+        submitted = st.form_submit_button("✅ 스케줄 등록", use_container_width=True, type="primary")
+
+    if submitted:
+        if not s_input.strip():
+            st.warning("입력 내용을 작성해주세요.")
+        else:
+            try:
+                sid = sched_mod.add_schedule(
+                    user_input=s_input.strip(),
+                    frequency=freq,
+                    hour=int(hour) if hour is not None else None,
+                    minute=int(minute),
+                    day_of_week=int(dow) if dow is not None else None,
+                    day=int(day) if day is not None else None,
+                    send_email=send_email,
+                    email_format=email_format,
+                )
+                st.success(f"스케줄 #{sid} 등록 완료")
+                st.rerun()
+            except Exception as e:
+                st.error(f"등록 실패: {e}")
+
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:18px 0;'></div>")
+
+    # ── 등록된 스케줄 목록 ──────────────────────────────
+    st.html("<div style='font-size:13px;font-weight:700;color:#1d1d1f;margin-bottom:8px;'>📋 등록된 스케줄</div>")
+
+    if not all_scheds:
+        st.html("""
+        <div style="background:#fff;border:1.5px solid rgba(0,0,0,0.15);border-radius:12px;
+        padding:48px 16px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:12px;">⏰</div>
+            <div style="font-size:14px;font-weight:600;color:#1d1d1f;">등록된 스케줄이 없습니다</div>
+        </div>
+        """)
+    else:
+        for s in all_scheds:
+            # 다음 실행 시간
+            nxt = sched_mod.next_run_time(s)
+            nxt_str = nxt.strftime("%Y-%m-%d %H:%M") if nxt else "—"
+
+            # 주기 표시
+            if s["frequency"] == "hourly":
+                cycle = f"매시간 {s['minute']:02d}분"
+            elif s["frequency"] == "daily":
+                cycle = f"매일 {s['hour']:02d}:{s['minute']:02d}"
+            elif s["frequency"] == "weekly":
+                dow_lbl = DOW_LABELS[s["day_of_week"]] if s["day_of_week"] is not None else "?"
+                cycle = f"매주 {dow_lbl} {s['hour']:02d}:{s['minute']:02d}"
+            elif s["frequency"] == "monthly":
+                cycle = f"매월 {s['day']}일 {s['hour']:02d}:{s['minute']:02d}"
+            else:
+                cycle = s["frequency"]
+
+            preview = (s["user_input"] or "")[:40]
+            if len(s["user_input"] or "") > 40:
+                preview += "…"
+
+            status_badge_bg, status_badge_color = ("#d4edda", "#1a5e2a") if s["enabled"] else ("#e8e8ed", "#6e6e73")
+            status_badge_label = "활성" if s["enabled"] else "정지"
+
+            # 마지막 실행
+            last_run = s.get("last_run") or "—"
+            last_status = s.get("last_status")
+            if last_status == "success":
+                last_badge = "<span style='color:#1a5e2a;font-weight:600;'>✅ 성공</span>"
+            elif last_status == "fail":
+                last_badge = "<span style='color:#7a1515;font-weight:600;'>❌ 실패</span>"
+            else:
+                last_badge = "<span style='color:#6e6e73;'>—</span>"
+
+            header = f"#{s['id']}  ·  {preview}  ·  {cycle}  ·  다음 {nxt_str}"
+            with st.expander(header, expanded=False):
+                meta_html = f"""
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                    <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:{status_badge_bg};color:{status_badge_color};">{status_badge_label}</span>
+                    <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#fef9c3;color:#713f12;">첨부 {FMT_LABELS.get(s['email_format'] or 'none', '-')}</span>
+                    <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:#cce4ff;color:#003d7a;">📧 {'발송' if s['send_email'] else '미발송'}</span>
+                </div>
+                <div style="font-size:12px;color:#6e6e73;line-height:1.7;">
+                    <b>입력:</b> {html_lib.escape(s['user_input'] or '')}<br>
+                    <b>다음 실행:</b> {nxt_str}<br>
+                    <b>마지막 실행:</b> {html_lib.escape(last_run)} · {last_badge}
+                </div>
+                """
+                st.markdown(meta_html, unsafe_allow_html=True)
+
+                bc1, bc2 = st.columns(2)
+                with bc1:
+                    toggle_label = "⏸  비활성화" if s["enabled"] else "▶  활성화"
+                    if st.button(toggle_label, key=f"toggle_{s['id']}", use_container_width=True):
+                        sched_mod.set_enabled(s["id"], not s["enabled"])
+                        st.rerun()
+                with bc2:
+                    if st.button("🗑  삭제", key=f"del_{s['id']}", use_container_width=True):
+                        sched_mod.delete_schedule(s["id"])
+                        st.success(f"스케줄 #{s['id']} 삭제됨")
+                        st.rerun()
+
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.12);margin:14px 0;'></div>")
+    st.caption("💡 실행 결과는 자동으로 히스토리 탭에 저장됩니다. 모든 시간은 Asia/Seoul 기준입니다.")
 
     st.markdown("</div>", unsafe_allow_html=True)
