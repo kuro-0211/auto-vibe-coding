@@ -134,6 +134,11 @@ def add_log(agent, action, content=""):
 def set_step(key, status):
     st.session_state.step_status[key] = status
 
+@st.cache_data(show_spinner=False, max_entries=200)
+def _build_history_files(history_id: int, final_output: str, code: str) -> tuple[bytes, bytes]:
+    """history 항목별 PDF/Word 바이트 캐시. (history_id, content) 기반 키."""
+    return export_to_pdf(final_output, code), export_to_docx(final_output, code)
+
 # ── 사이드바 ───────────────────────────────────────────────
 with st.sidebar:
     st.html("""
@@ -721,6 +726,48 @@ elif st.session_state.current_page == "history":
                         st.markdown(detail["error_analysis"])
                     else:
                         st.caption("에러 분석 없음")
+
+                # ── 다운로드 섹션 ─────────────────────────
+                if detail.get("final_output"):
+                    st.html("<div style='height:1px;background:rgba(0,0,0,0.08);margin:12px 0 8px;'></div>")
+                    st.html("<div style='font-size:10px;font-weight:700;color:#aeaeb2;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;'>결과 다운로드</div>")
+                    try:
+                        pdf_bytes, docx_bytes = _build_history_files(
+                            detail["id"],
+                            detail.get("final_output", "") or "",
+                            detail.get("code_result", "") or "",
+                        )
+                        dc1, dc2, dc3 = st.columns(3)
+                        fname_stem = f"aria_{detail['id']}_{(detail.get('created_at') or '').replace(':','').replace('-','').replace('T','_')}"
+                        with dc1:
+                            st.download_button(
+                                "📄  PDF",
+                                data=pdf_bytes,
+                                file_name=f"{fname_stem}.pdf",
+                                mime="application/pdf",
+                                key=f"dl_pdf_{detail['id']}",
+                                use_container_width=True,
+                            )
+                        with dc2:
+                            st.download_button(
+                                "📝  Word",
+                                data=docx_bytes,
+                                file_name=f"{fname_stem}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"dl_docx_{detail['id']}",
+                                use_container_width=True,
+                            )
+                        with dc3:
+                            st.download_button(
+                                "📋  Markdown",
+                                data=(detail.get("final_output") or "").encode("utf-8"),
+                                file_name=f"{fname_stem}.md",
+                                mime="text/markdown",
+                                key=f"dl_md_{detail['id']}",
+                                use_container_width=True,
+                            )
+                    except Exception as e:
+                        st.error(f"파일 생성 실패: {e}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
