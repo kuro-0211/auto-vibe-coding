@@ -32,117 +32,152 @@ st.html("""
 <style>
 html, body, [class*="css"] { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
 
-.stApp { background: #1a1a1a !important; color: #ececec !important; }
+.stApp { background: #faf9f5 !important; color: #1f1f1f !important; }
 .main .block-container { padding: 24px 24px 220px 24px !important; max-width: 860px !important; margin: 0 auto !important; }
-#MainMenu, header, footer { visibility: hidden; }
 
-/* ── Sidebar ─────────────────────────────────────────── */
-[data-testid="stSidebar"] { background: #171717 !important; border-right: 1px solid rgba(255,255,255,0.06) !important; width: 260px !important; }
+/* 메뉴/푸터만 숨기고 사이드바 토글 버튼은 살림 */
+#MainMenu, footer { visibility: hidden; }
+header { background: transparent !important; }
+[data-testid="stHeader"] { background: transparent !important; height: auto !important; }
+[data-testid="collapsedControl"], [data-testid="stSidebarCollapsedControl"] { visibility: visible !important; color: #1f1f1f !important; }
+
+/* ── Sidebar (warm cream, 항상 보이게) ─────────────────── */
+[data-testid="stSidebar"] {
+    background: #f0eee6 !important;
+    border-right: 1px solid rgba(0,0,0,0.10) !important;
+    width: 260px !important; min-width: 260px !important;
+}
 [data-testid="stSidebar"] > div { padding: 0 !important; }
 [data-testid="stSidebarNav"] { display: none !important; }
-[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] label { color: #ececec !important; }
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div, [data-testid="stSidebar"] label { color: #1f1f1f !important; }
 [data-testid="stSidebar"] .stButton > button {
-    background: transparent !important; color: #ececec !important;
+    background: transparent !important; color: #1f1f1f !important;
     border: 1px solid transparent !important;
     font-size: 13px !important; font-weight: 500 !important;
     text-align: left !important; padding: 8px 12px !important;
     border-radius: 8px !important; width: 100% !important;
 }
-[data-testid="stSidebar"] .stButton > button:hover { background: rgba(255,255,255,0.05) !important; }
-[data-testid="stSidebar"] .stButton > button[kind="primary"] { background: rgba(204,120,92,0.18) !important; color: #cc785c !important; border-color: rgba(204,120,92,0.35) !important; }
-[data-testid="stSidebar"] [data-testid="metric-container"] { background: #1f1f1f !important; border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 8px !important; padding: 8px 12px !important; }
-[data-testid="stSidebar"] [data-testid="stMetricValue"] { color: #ececec !important; font-size: 18px !important; font-weight: 600 !important; }
-[data-testid="stSidebar"] [data-testid="stMetricLabel"] { color: #8a8a8a !important; font-size: 11px !important; }
+[data-testid="stSidebar"] .stButton > button:hover { background: rgba(0,0,0,0.04) !important; }
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: rgba(204,120,92,0.14) !important;
+    color: #b86a4f !important;
+    border-color: rgba(204,120,92,0.35) !important;
+}
+[data-testid="stSidebar"] [data-testid="metric-container"] {
+    background: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+    border-radius: 8px !important; padding: 8px 12px !important;
+}
+[data-testid="stSidebar"] [data-testid="stMetricValue"] { color: #1f1f1f !important; font-size: 18px !important; font-weight: 600 !important; }
+[data-testid="stSidebar"] [data-testid="stMetricLabel"] { color: #6e6e73 !important; font-size: 11px !important; }
 
 /* ── Main buttons ─────────────────────────────────────── */
 .stButton > button {
     font-family: 'Pretendard', sans-serif !important;
     font-size: 13px !important; font-weight: 500 !important;
     border-radius: 8px !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    background: rgba(255,255,255,0.04) !important; color: #ececec !important;
+    border: 1px solid rgba(0,0,0,0.12) !important;
+    background: #ffffff !important; color: #1f1f1f !important;
     padding: 8px 14px !important;
 }
-.stButton > button:hover { background: rgba(255,255,255,0.08) !important; }
+.stButton > button:hover { background: #f5f4ef !important; }
 .stButton > button[kind="primary"] { background: #cc785c !important; color: #ffffff !important; border-color: #cc785c !important; }
 .stButton > button[kind="primary"]:hover { background: #b86a4f !important; border-color: #b86a4f !important; }
-[data-testid="stDownloadButton"] > button { background: rgba(255,255,255,0.04) !important; color: #ececec !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; }
-[data-testid="stDownloadButton"] > button:hover { background: rgba(255,255,255,0.08) !important; }
+[data-testid="stDownloadButton"] > button {
+    background: #ffffff !important; color: #1f1f1f !important;
+    border: 1px solid rgba(0,0,0,0.12) !important; border-radius: 8px !important;
+}
+[data-testid="stDownloadButton"] > button:hover { background: #f5f4ef !important; }
 
 /* ── Inputs ───────────────────────────────────────────── */
 .stTextArea textarea, .stTextInput input, .stNumberInput input {
-    background: #2f2f2f !important; color: #ececec !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    background: #ffffff !important; color: #1f1f1f !important;
+    border: 1px solid rgba(0,0,0,0.14) !important;
     border-radius: 10px !important; font-family: 'Pretendard', sans-serif !important;
     font-size: 14px !important; line-height: 1.55 !important;
 }
-.stTextArea textarea:focus, .stTextInput input:focus, .stNumberInput input:focus { border-color: #cc785c !important; box-shadow: 0 0 0 2px rgba(204,120,92,0.18) !important; }
+.stTextArea textarea:focus, .stTextInput input:focus, .stNumberInput input:focus {
+    border-color: #cc785c !important;
+    box-shadow: 0 0 0 2px rgba(204,120,92,0.18) !important;
+}
 .stTextArea label, .stTextInput label, .stNumberInput label, .stSelectbox label, .stCheckbox label {
-    color: #8a8a8a !important; font-size: 11px !important; font-weight: 700 !important;
+    color: #6e6e73 !important; font-size: 11px !important; font-weight: 700 !important;
     text-transform: uppercase !important; letter-spacing: 0.06em !important;
 }
 
 /* ── Selectbox ───────────────────────────────────────── */
-[data-baseweb="select"] > div { background: #2f2f2f !important; border-color: rgba(255,255,255,0.08) !important; color: #ececec !important; border-radius: 10px !important; }
-[data-baseweb="popover"] { background: #262626 !important; }
-[role="listbox"] { background: #262626 !important; }
-[role="option"] { color: #ececec !important; }
-[role="option"]:hover { background: rgba(255,255,255,0.06) !important; }
+[data-baseweb="select"] > div {
+    background: #ffffff !important;
+    border-color: rgba(0,0,0,0.14) !important;
+    color: #1f1f1f !important; border-radius: 10px !important;
+}
+[data-baseweb="popover"] { background: #ffffff !important; border: 1px solid rgba(0,0,0,0.08) !important; }
+[role="listbox"] { background: #ffffff !important; }
+[role="option"] { color: #1f1f1f !important; }
+[role="option"]:hover { background: #f5f4ef !important; }
 
 /* ── Checkbox ─────────────────────────────────────────── */
-.stCheckbox label { text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; color: #ececec !important; font-weight: 500 !important; }
+.stCheckbox label { text-transform: none !important; letter-spacing: 0 !important; font-size: 13px !important; color: #1f1f1f !important; font-weight: 500 !important; }
 
 /* ── Code blocks ──────────────────────────────────────── */
 .stCodeBlock, pre, code {
-    background: #1a1a1a !important; color: #e6e6e6 !important;
+    background: #f5f4ef !important; color: #1f1f1f !important;
     border-left: 3px solid #cc785c !important;
     border-radius: 8px !important; font-size: 12.5px !important;
 }
-.stCodeBlock pre { background: #1a1a1a !important; }
+.stCodeBlock pre { background: #f5f4ef !important; }
 
 /* ── Markdown text ────────────────────────────────────── */
-.stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown strong, .stMarkdown em { color: #ececec !important; }
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #ececec !important; }
+.stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown strong, .stMarkdown em { color: #1f1f1f !important; }
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #1f1f1f !important; }
 .stMarkdown a { color: #cc785c !important; }
-.stMarkdown blockquote { border-left: 3px solid #cc785c !important; background: rgba(204,120,92,0.06) !important; color: #ececec !important; }
+.stMarkdown blockquote { border-left: 3px solid #cc785c !important; background: rgba(204,120,92,0.06) !important; color: #1f1f1f !important; }
 
 /* ── Expander ─────────────────────────────────────────── */
-[data-testid="stExpander"] { background: #262626 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; }
-[data-testid="stExpander"] summary { color: #ececec !important; font-size: 13px !important; font-weight: 500 !important; }
-[data-testid="stExpander"] summary:hover { background: rgba(255,255,255,0.03) !important; }
+[data-testid="stExpander"] {
+    background: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.10) !important;
+    border-radius: 12px !important;
+}
+[data-testid="stExpander"] summary { color: #1f1f1f !important; font-size: 13px !important; font-weight: 500 !important; }
+[data-testid="stExpander"] summary:hover { background: #fafaf7 !important; }
 
 /* ── Alerts ───────────────────────────────────────────── */
-.stSuccess { background: rgba(76,175,80,0.10) !important; border: 1px solid rgba(76,175,80,0.30) !important; color: #a5d6a7 !important; border-radius: 10px !important; }
-.stError   { background: rgba(239,83,80,0.10) !important; border: 1px solid rgba(239,83,80,0.30) !important; color: #ef9a9a !important; border-radius: 10px !important; }
-.stWarning { background: rgba(255,152,0,0.10) !important; border: 1px solid rgba(255,152,0,0.30) !important; color: #ffcc80 !important; border-radius: 10px !important; }
-.stInfo    { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.08) !important; color: #ececec !important; border-radius: 10px !important; }
+.stSuccess { background: rgba(76,175,80,0.10) !important; border: 1px solid rgba(76,175,80,0.30) !important; color: #2e7d32 !important; border-radius: 10px !important; }
+.stError   { background: rgba(239,83,80,0.08) !important; border: 1px solid rgba(239,83,80,0.30) !important; color: #c62828 !important; border-radius: 10px !important; }
+.stWarning { background: rgba(255,152,0,0.10) !important; border: 1px solid rgba(255,152,0,0.30) !important; color: #b26500 !important; border-radius: 10px !important; }
+.stInfo    { background: #f5f4ef !important; border: 1px solid rgba(0,0,0,0.08) !important; color: #1f1f1f !important; border-radius: 10px !important; }
 
 /* ── Metric (main) ────────────────────────────────────── */
-[data-testid="metric-container"] { background: #262626 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; padding: 12px 16px !important; }
-[data-testid="stMetricValue"] { color: #ececec !important; font-size: 22px !important; font-weight: 600 !important; }
-[data-testid="stMetricLabel"] { color: #8a8a8a !important; font-size: 11px !important; }
+[data-testid="metric-container"] {
+    background: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+    border-radius: 12px !important; padding: 12px 16px !important;
+}
+[data-testid="stMetricValue"] { color: #1f1f1f !important; font-size: 22px !important; font-weight: 600 !important; }
+[data-testid="stMetricLabel"] { color: #6e6e73 !important; font-size: 11px !important; }
 
 /* ── Tabs ─────────────────────────────────────────────── */
-[data-baseweb="tab-list"] { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
-[data-baseweb="tab"] { color: #8a8a8a !important; }
+[data-baseweb="tab-list"] { background: transparent !important; border-bottom: 1px solid rgba(0,0,0,0.10) !important; }
+[data-baseweb="tab"] { color: #6e6e73 !important; }
 [data-baseweb="tab"][aria-selected="true"] { color: #cc785c !important; border-bottom-color: #cc785c !important; }
 
 /* ── Captions ─────────────────────────────────────────── */
-[data-testid="stCaptionContainer"], small { color: #8a8a8a !important; }
+[data-testid="stCaptionContainer"], small { color: #6e6e73 !important; }
 
 /* ── Forms ───────────────────────────────────────────── */
 [data-testid="stForm"] { background: transparent !important; border: none !important; padding: 0 !important; }
 
-/* ── Sticky input bar (실행 페이지 전용 — container key=input_bar) ── */
+/* ── Sticky input bar (실행 페이지 전용) ─────────────── */
 .st-key-input_bar {
     position: fixed !important;
     bottom: 0 !important;
     left: 260px !important;
     right: 0 !important;
-    background: linear-gradient(180deg, rgba(26,26,26,0.0) 0%, #1a1a1a 22%) !important;
+    background: linear-gradient(180deg, rgba(250,249,245,0.0) 0%, #faf9f5 22%) !important;
     padding: 28px 24px 18px 24px !important;
     z-index: 90 !important;
-    border-top: 1px solid rgba(255,255,255,0.06) !important;
+    border-top: 1px solid rgba(0,0,0,0.08) !important;
 }
 .st-key-input_bar > div { max-width: 812px; margin: 0 auto; }
 
@@ -156,14 +191,15 @@ html, body, [class*="css"] { font-family: 'Pretendard', -apple-system, BlinkMacS
 # 상수 / 설정
 # ══════════════════════════════════════════════════════════
 ACCENT = "#cc785c"
-CARD_BG = "#262626"
-BORDER = "rgba(255,255,255,0.08)"
-TEXT = "#ececec"
-SUB = "#8a8a8a"
-HINT = "#555555"
-SUCCESS = "#4caf50"
-FAIL = "#ef5350"
-WARN = "#ff9800"
+CARD_BG = "#ffffff"
+BORDER = "rgba(0,0,0,0.10)"
+TEXT = "#1f1f1f"
+SUB = "#6e6e73"
+HINT = "#aeaeb2"
+SUCCESS = "#2e7d32"
+FAIL = "#c62828"
+WARN = "#b26500"
+CODE_BG = "#f5f4ef"
 
 ALL_STEPS = [
     ("research",        "Research"),
@@ -264,8 +300,8 @@ with st.sidebar:
         <div style="display:flex;align-items:center;gap:8px;">
             <div style="width:28px;height:28px;border-radius:8px;background:#cc785c;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;">A</div>
             <div>
-                <div style="font-size:14px;font-weight:700;color:#ececec;line-height:1.1;">ARIA</div>
-                <div style="font-size:10px;color:#8a8a8a;">v1.3 · Claude UI</div>
+                <div style="font-size:14px;font-weight:700;color:#1f1f1f;line-height:1.1;">ARIA</div>
+                <div style="font-size:10px;color:#6e6e73;">v1.3 · Claude UI</div>
             </div>
         </div>
     </div>
@@ -278,14 +314,14 @@ with st.sidebar:
         st.session_state.current_page = "run"
         st.rerun()
 
-    st.html("<div style='height:1px;background:rgba(255,255,255,0.06);margin:10px 12px;'></div>")
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.08);margin:10px 12px;'></div>")
 
     # 히스토리 목록 (날짜 그룹핑)
-    st.html("<div style='font-size:10px;font-weight:700;color:#8a8a8a;text-transform:uppercase;letter-spacing:0.06em;padding:4px 16px 6px;'>히스토리</div>")
+    st.html("<div style='font-size:10px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.06em;padding:4px 16px 6px;'>히스토리</div>")
 
     hist_items = list_history(limit=50)
     if not hist_items:
-        st.html("<div style='font-size:12px;color:#555;padding:4px 16px 12px;'>아직 비어 있어요</div>")
+        st.html("<div style='font-size:12px;color:#aeaeb2;padding:4px 16px 12px;'>아직 비어 있어요</div>")
     else:
         groups: dict[str, list] = {}
         for item in hist_items:
@@ -295,7 +331,7 @@ with st.sidebar:
         for grp in order:
             if grp not in groups:
                 continue
-            st.html(f"<div style='font-size:10px;color:#666;padding:6px 16px 2px;font-weight:600;'>{grp}</div>")
+            st.html(f"<div style='font-size:10px;color:#aeaeb2;padding:6px 16px 2px;font-weight:600;'>{grp}</div>")
             for item in groups[grp]:
                 preview = (item.get("user_input") or "").strip()
                 preview = preview[:25] + ("…" if len(preview) > 25 else "")
@@ -311,7 +347,7 @@ with st.sidebar:
                     st.session_state.current_page = "history_detail"
                     st.rerun()
 
-    st.html("<div style='height:1px;background:rgba(255,255,255,0.06);margin:10px 12px;'></div>")
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.08);margin:10px 12px;'></div>")
 
     # 하단 nav
     for page_id, icon, label in [
@@ -325,7 +361,7 @@ with st.sidebar:
             st.session_state.current_page = page_id
             st.rerun()
 
-    st.html("<div style='height:1px;background:rgba(255,255,255,0.06);margin:10px 12px;'></div>")
+    st.html("<div style='height:1px;background:rgba(0,0,0,0.08);margin:10px 12px;'></div>")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -335,8 +371,8 @@ with st.sidebar:
 
     st.html(f"""
     <div style="padding:10px 16px 14px;">
-        <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">세션</div>
-        <div style="font-size:10px;color:#444;font-family:monospace;word-break:break-all;">{st.session_state.session_id[:22]}…</div>
+        <div style="font-size:10px;font-weight:700;color:#aeaeb2;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">세션</div>
+        <div style="font-size:10px;color:#6e6e73;font-family:monospace;word-break:break-all;">{st.session_state.session_id[:22]}…</div>
     </div>
     """)
 
@@ -365,9 +401,9 @@ def page_header(title: str, sub: str = ""):
     <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 22px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:24px;height:24px;border-radius:6px;background:#cc785c;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;">A</div>
-        <span style="font-size:18px;font-weight:600;color:#ececec;">{html_lib.escape(title)}</span>
+        <span style="font-size:18px;font-weight:600;color:#1f1f1f;">{html_lib.escape(title)}</span>
       </div>
-      <span style="font-size:11px;color:#8a8a8a;background:rgba(255,255,255,0.04);padding:4px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.06);">{html_lib.escape(sub)}</span>
+      <span style="font-size:11px;color:#6e6e73;background:#ffffff;padding:4px 12px;border-radius:999px;border:1px solid rgba(0,0,0,0.10);">{html_lib.escape(sub)}</span>
     </div>
     """)
 
@@ -398,10 +434,10 @@ def pipeline_bar(status_map: dict):
             color, bg, dot = ACCENT, f"{ACCENT}1f", ACCENT
             anim = ""
         elif s == "running":
-            color, bg, dot = "#ffffff", "rgba(255,255,255,0.10)", "#ffffff"
+            color, bg, dot = "#1f1f1f", "rgba(204,120,92,0.10)", ACCENT
             anim = "animation:pulse 1.2s ease-in-out infinite;"
         else:
-            color, bg, dot = "#555", "rgba(255,255,255,0.03)", "#3a3a3a"
+            color, bg, dot = "#aeaeb2", "#f5f4ef", "#d4d4d0"
             anim = ""
         parts.append(f"""
         <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:{bg};color:{color};font-size:11px;font-weight:600;">
@@ -426,8 +462,8 @@ if st.session_state.current_page == "run":
         st.html(f"""
         <div style="text-align:center;padding:40px 0 28px;">
             <div style="width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#cc785c,#a85b40);display:inline-flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;margin-bottom:16px;">A</div>
-            <div style="font-size:24px;font-weight:600;color:#ececec;margin-bottom:6px;">무엇을 도와드릴까요?</div>
-            <div style="font-size:13px;color:#8a8a8a;">키워드나 목적을 입력하면 리서치 · 코드 생성 · 실행까지 자동 처리해드립니다</div>
+            <div style="font-size:24px;font-weight:600;color:#1f1f1f;margin-bottom:6px;">무엇을 도와드릴까요?</div>
+            <div style="font-size:13px;color:#6e6e73;">키워드나 목적을 입력하면 리서치 · 코드 생성 · 실행까지 자동 처리해드립니다</div>
         </div>
         """)
 
@@ -467,7 +503,7 @@ if st.session_state.current_page == "run":
                         add_log("Research Agent", "웹 검색 완료", res)
                         safe = html_lib.escape(res[:500])
                         with live_research:
-                            card("리서치 결과", f"<div style='white-space:pre-wrap;color:#cccccc;'>{safe}{'…' if len(res) > 500 else ''}</div>",
+                            card("리서치 결과", f"<div style='white-space:pre-wrap;color:#1f1f1f;'>{safe}{'…' if len(res) > 500 else ''}</div>",
                                  badge="완료", badge_color=SUCCESS, icon="🔍")
                     elif node_name == "code_decision":
                         add_log("Code Decision", f"코드 필요: {node_state.get('needs_code', False)}")
@@ -476,7 +512,7 @@ if st.session_state.current_page == "run":
                         add_log("Code Generation", "코드 생성 완료", code)
                         safe = html_lib.escape(code[:400])
                         with live_code:
-                            card("생성된 코드", f"<pre style='background:#1a1a1a;border-left:3px solid {ACCENT};border-radius:8px;padding:12px;font-size:12px;color:#e6e6e6;margin:0;overflow:auto;'>{safe}{'…' if len(code) > 400 else ''}</pre>",
+                            card("생성된 코드", f"<pre style='background:#f5f4ef;border-left:3px solid {ACCENT};border-radius:8px;padding:12px;font-size:12px;color:#1f1f1f;margin:0;overflow:auto;'>{safe}{'…' if len(code) > 400 else ''}</pre>",
                                  badge="생성", badge_color=ACCENT, icon="🦙")
                     elif node_name == "code_review":
                         add_log("Code Review", "코드 리뷰 완료")
@@ -504,15 +540,15 @@ if st.session_state.current_page == "run":
 
         if result.get("research_result"):
             safe_res = html_lib.escape(result["research_result"][:600])
-            card("리서치 결과", f"<div style='white-space:pre-wrap;color:#cccccc;'>{safe_res}…</div>",
+            card("리서치 결과", f"<div style='white-space:pre-wrap;color:#1f1f1f;'>{safe_res}…</div>",
                  badge="완료", badge_color=SUCCESS, icon="🔍")
 
         if result.get("code_result"):
             # 코드 검토 안내
             st.html(f"""
             <div style="background:rgba(255,152,0,0.10);border:1px solid rgba(255,152,0,0.30);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
-                <div style="font-size:13px;font-weight:600;color:#ffcc80;margin-bottom:4px;">✏️ 코드 검토 및 수정</div>
-                <div style="font-size:12px;color:#ffcc80;opacity:0.85;">리뷰된 코드를 직접 편집할 수 있습니다. 수정 후 승인하면 편집한 코드로 실행됩니다.</div>
+                <div style="font-size:13px;font-weight:600;color:#b26500;margin-bottom:4px;">✏️ 코드 검토 및 수정</div>
+                <div style="font-size:12px;color:#b26500;opacity:0.85;">리뷰된 코드를 직접 편집할 수 있습니다. 수정 후 승인하면 편집한 코드로 실행됩니다.</div>
             </div>
             """)
 
@@ -560,15 +596,15 @@ if st.session_state.current_page == "run":
                             with live_exec:
                                 card("실행 결과", f"""
                                 <div style='display:flex;gap:8px;margin-bottom:10px;'>
-                                  <span style='font-size:11px;background:rgba(76,175,80,0.18);color:#a5d6a7;padding:3px 9px;border-radius:999px;font-weight:600;'>⏱ {elapsed}s</span>
-                                  <span style='font-size:11px;background:rgba(76,175,80,0.18);color:#a5d6a7;padding:3px 9px;border-radius:999px;font-weight:600;'>📄 {lines}줄</span>
+                                  <span style='font-size:11px;background:rgba(76,175,80,0.18);color:#2e7d32;padding:3px 9px;border-radius:999px;font-weight:600;'>⏱ {elapsed}s</span>
+                                  <span style='font-size:11px;background:rgba(76,175,80,0.18);color:#2e7d32;padding:3px 9px;border-radius:999px;font-weight:600;'>📄 {lines}줄</span>
                                 </div>
-                                <pre style='background:#1a1a1a;border-left:3px solid {SUCCESS};border-radius:8px;padding:12px;font-size:12px;color:#a5d6a7;margin:0;overflow:auto;'>$ python solution.py\n{out}</pre>
+                                <pre style='background:#f5f4ef;border-left:3px solid {SUCCESS};border-radius:8px;padding:12px;font-size:12px;color:#2e7d32;margin:0;overflow:auto;'>$ python solution.py\n{out}</pre>
                                 """, badge="성공", badge_color=SUCCESS, icon="🐳")
                         elif exec_r:
                             err = html_lib.escape((exec_r.get("error", "") or "")[:300])
                             with live_exec:
-                                card("실행 결과", f"<pre style='background:#1a1a1a;border-left:3px solid {WARN};border-radius:8px;padding:12px;font-size:12px;color:#ffcc80;margin:0;'>{err}</pre>",
+                                card("실행 결과", f"<pre style='background:#f5f4ef;border-left:3px solid {WARN};border-radius:8px;padding:12px;font-size:12px;color:#b26500;margin:0;'>{err}</pre>",
                                      badge="실패 — 재시도", badge_color=WARN, icon="🐳")
                     elif node_name == "error_analysis":
                         retry = node_state.get("retry_count", 0)
@@ -577,7 +613,7 @@ if st.session_state.current_page == "run":
                         if analysis:
                             safe_a = html_lib.escape(analysis)
                             with live_exec:
-                                card(f"에러 분석 ({retry}/3)", f"<div style='white-space:pre-wrap;color:#ffcc80;'>{safe_a}</div>",
+                                card(f"에러 분석 ({retry}/3)", f"<div style='white-space:pre-wrap;color:#b26500;'>{safe_a}</div>",
                                      badge="분석 완료", badge_color=WARN, icon="⚠️")
                     elif node_name == "output":
                         add_log("Output Agent", "결과 정리 완료")
@@ -601,7 +637,7 @@ if st.session_state.current_page == "run":
 
         if exec_r and exec_r.get("success"):
             out = html_lib.escape(exec_r.get("output", "") or "")
-            card("실행 결과", f"<pre style='background:#1a1a1a;border-left:3px solid {SUCCESS};border-radius:8px;padding:12px;font-size:12px;color:#a5d6a7;margin:0;overflow:auto;'>$ python solution.py\n{out}</pre>",
+            card("실행 결과", f"<pre style='background:#f5f4ef;border-left:3px solid {SUCCESS};border-radius:8px;padding:12px;font-size:12px;color:#2e7d32;margin:0;overflow:auto;'>$ python solution.py\n{out}</pre>",
                  badge="성공", badge_color=SUCCESS, icon="🐳")
             if result.get("code_result"):
                 with st.expander("💻  생성된 코드", expanded=False):
@@ -613,11 +649,11 @@ if st.session_state.current_page == "run":
         elif exec_r and not exec_r.get("success"):
             if error_analysis:
                 safe_a = html_lib.escape(error_analysis)
-                card(f"에러 분석 결과 ({retry_count}회 시도)", f"<div style='white-space:pre-wrap;color:#ef9a9a;'>{safe_a}</div>",
+                card(f"에러 분석 결과 ({retry_count}회 시도)", f"<div style='white-space:pre-wrap;color:#c62828;'>{safe_a}</div>",
                      badge="실패", badge_color=FAIL, icon="⚠️")
             else:
                 err = html_lib.escape((exec_r.get("error", "") or "")[:400])
-                card("실행 결과", f"<pre style='background:#1a1a1a;border-left:3px solid {FAIL};border-radius:8px;padding:12px;font-size:12px;color:#ef9a9a;margin:0;'>{err}</pre>",
+                card("실행 결과", f"<pre style='background:#f5f4ef;border-left:3px solid {FAIL};border-radius:8px;padding:12px;font-size:12px;color:#c62828;margin:0;'>{err}</pre>",
                      badge=f"실패 ({retry_count}회)", badge_color=FAIL, icon="🐳")
             if result.get("code_result"):
                 with st.expander("💻  최종 생성된 코드", expanded=True):
@@ -745,7 +781,7 @@ elif st.session_state.current_page == "monitor":
             with st.expander(f"{icon}  {log['agent']} — {log['action']}", expanded=False):
                 if log.get("content"):
                     safe = html_lib.escape(log["content"])
-                    st.html(f"<div style='font-size:13px;color:#cccccc;line-height:1.65;white-space:pre-wrap;'>{safe}</div>")
+                    st.html(f"<div style='font-size:13px;color:#1f1f1f;line-height:1.65;white-space:pre-wrap;'>{safe}</div>")
 
 
 # ══════════════════════════════════════════════════════════
@@ -921,7 +957,7 @@ elif st.session_state.current_page == "schedule":
                 st.html(f"""
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
                     <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:{badge_color}22;color:{badge_color};">{badge_label}</span>
-                    <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,0.04);color:{TEXT};">첨부 {FMT_LABELS.get(s['email_format'] or 'none', '-')}</span>
+                    <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:#f5f4ef;color:{TEXT};border:1px solid rgba(0,0,0,0.06);">첨부 {FMT_LABELS.get(s['email_format'] or 'none', '-')}</span>
                     <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(204,120,92,0.18);color:{ACCENT};">📧 {'발송' if s['send_email'] else '미발송'}</span>
                 </div>
                 <div style="font-size:12px;color:{SUB};line-height:1.7;">
