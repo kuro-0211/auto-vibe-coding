@@ -1,0 +1,9 @@
+.web
+*.db
+*.db-shm
+*.db-wal
+reflex.lock
+assets/external/
+*.py[cod]
+.states
+__pycache__/

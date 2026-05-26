@@ -31,3 +31,6 @@ ollama_data/
 # ─── 출력물 ───
 output/
 *.log
+
+# ─── 백업 ───
+*.bak

@@ -11,7 +11,16 @@ def clean_code(code: str) -> str:
     return code
 
 def execute_code(code: str) -> dict:
-    with open("config/sandbox.yaml") as f:
+    # Resolve sandbox.yaml relative to project root, not CWD (which differs
+    # between Streamlit/Reflex/CLI launchers). `executor.py` lives at
+    # `<root>/src/sandbox/executor.py`, so go up two levels.
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(os.path.dirname(_here))
+    _cfg_path = os.path.join(_root, "config", "sandbox.yaml")
+    if not os.path.exists(_cfg_path):
+        # fallback: original CWD-relative path (in case someone overrides root)
+        _cfg_path = "config/sandbox.yaml"
+    with open(_cfg_path) as f:
         config = yaml.safe_load(f)["sandbox"]
 
     clean = clean_code(code)

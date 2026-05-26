@@ -12,7 +12,7 @@
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.1.10-FF6B6B)
 ![Docker](https://img.shields.io/badge/Docker-28.x-2496ED?logo=docker&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-black)
-![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
+![Reflex](https://img.shields.io/badge/Reflex-Dashboard-5B5BD6?logo=react&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
@@ -27,7 +27,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 - 🔍 최신 웹 정보를 기반으로 리서치 (Tavily advanced, 도메인 무제한, 게시일 포함)
 - 🛡️ 검색 결과에 없는 내용은 LLM이 추측하지 않도록 환각 억제 프롬프트 적용
 - 🤖 LLM 기반 코드 생성 필요 여부 판단 (리서치 전용 / 코드 생성 분기)
-- 🦙 리서치 결과를 컨텍스트로 활용한 코드 자동 생성
+- 🦙 리서치 결과를 컨텍스트로 활용한 코드 자동 생성 (한국어 주석은 `# [설명] ` 접두어로 통일 → HITL 편집 시 식별/검색 용이)
 - 🐳 Docker 샌드박스에서 코드를 실행하고 오류 발생 시 Self-Correction
 - ⚠️ 에러 분석 내용을 대시보드에서 실시간 확인
 - ✏️ Human-in-the-Loop으로 사용자가 직접 코드 편집 후 실행
@@ -99,7 +99,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 | **Local LLM** | gemma3:4b | 문서 작성, 에러 분석 |
 | **GPU** | NVIDIA RTX 3080 | 로컬 추론 가속 |
 | **샌드박스** | Docker | 보안 격리 코드 실행 환경 |
-| **UI** | Streamlit | 사이드바 기반 대시보드 |
+| **UI** | Reflex (React + FastAPI) | 사이드바 기반 대시보드, 실시간 스트리밍 |
 | **이메일** | 네이버 SMTP | 결과물 자동 발송 + 첨부 |
 | **문서 변환** | fpdf2, python-docx | PDF / Word 파일 생성 (한글 NanumGothic) |
 | **스케줄링** | APScheduler | 매시간/매일/매주/매월 백그라운드 실행 (Asia/Seoul) |
@@ -141,15 +141,15 @@ Docker 샌드박스 실행
 
 ---
 
-## 🖥️ Streamlit 대시보드
+## 🖥️ Reflex 대시보드
 
-사이드바 기반 5탭 구조의 대시보드를 제공합니다.
+사이드바 기반 5탭 구조의 대시보드를 제공합니다. Reflex 백그라운드 이벤트로 LangGraph 스트림을 받아 단계별 결과를 실시간 갱신합니다.
 
 | 탭 | 기능 |
 |---|---|
-| 🚀 실행 | 키워드/목적 입력, 첨부 형식 선택, 파이프라인 단계별 실시간 표시, **HITL 코드 편집**, PDF/Word/Markdown 다운로드 |
+| 🚀 실행 | 키워드/목적 입력, 첨부 형식 선택, 파이프라인 단계별 실시간 표시, **HITL 코드 편집** (한국어 주석 `# [설명] ` 마커로 식별 용이), PDF/Word/Markdown 다운로드 |
 | 📊 모니터링 | 에이전트 협업 흐름, 단계별 입출력 내용 확인 |
-| 📝 로그 | LLM 호출 내역, 토큰 사용량 확인 |
+| 📝 로그 | LLM 호출 내역, 토큰 사용량 실시간 갱신 |
 | 🕒 히스토리 | 모든 실행 기록 자동 저장 + **PDF / Word / Markdown 재다운로드**, 성공/실패 뱃지, 전체 삭제 |
 | ⏰ 스케줄 | 매시간/매일/매주/매월 자동 실행 등록, 활성/비활성 토글, 다음 실행 시간 표시 |
 
@@ -231,7 +231,23 @@ aria/
 │   │   ├── history.py              ← 실행 히스토리 저장/조회
 │   │   └── scheduler.py            ← APScheduler 백그라운드 + 스케줄 DB
 │   └── ui/
-│       └── dashboard.py
+│       └── dashboard.py             ← (legacy Streamlit 대시보드, 참고용)
+├── aria_app/                        ← Reflex 프런트엔드 (현 메인 UI)
+│   ├── rxconfig.py
+│   ├── requirements.txt
+│   └── aria_app/
+│       ├── aria_app.py              · 라우트 등록
+│       ├── state.py                 · AriaState (phase1/phase2 스트림 + LLM 로그 미러링)
+│       ├── theme.py
+│       ├── components/
+│       │   ├── layout.py
+│       │   └── sidebar.py
+│       └── pages/
+│           ├── run.py               · 실행 + HITL 코드 편집
+│           ├── monitor.py
+│           ├── log_page.py
+│           ├── history_detail.py
+│           └── schedule_page.py
 ├── config/
 │   ├── agents.yaml
 │   ├── models.yaml
@@ -297,7 +313,8 @@ docker exec -it auto-vibe-coding_ollama_1 ollama pull gemma3:4b
 ### 대시보드 접속
 
 ```
-http://localhost:8501
+http://localhost:3000      # Reflex 프런트엔드 (현 메인 UI)
+http://localhost:8000      # Reflex 백엔드 (FastAPI)
 ```
 
 </details>

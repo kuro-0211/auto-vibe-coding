@@ -42,7 +42,8 @@ def run_code_generation(user_input: str, research_result: str) -> str:
 
     ## 요구사항
     - 실행 가능한 완성된 코드만 작성
-    - 주석 포함
+    - 한국어 주석을 포함하되, 모든 한국어 주석은 반드시 `# [설명] `(또는 들여쓰기 후 `# [설명] `) 접두어로 시작
+    - 영어 주석을 쓸 경우에는 `# [설명] ` 접두어를 붙이지 않음
     - 코드 블록 없이 순수 코드만 출력
     - Python으로 작성
     """
@@ -81,6 +82,11 @@ def run_code_review(code: str, user_input: str) -> str:
 
     문제가 있으면 수정된 코드를, 없으면 원본 코드를 그대로 반환하세요.
     코드만 반환하고 설명은 제외하세요.
+
+    ## 주석 규칙 (반드시 유지)
+    - 한국어 주석은 모두 `# [설명] ` 접두어를 유지하거나 새로 붙이세요.
+    - 영어 주석에는 `# [설명] ` 접두어를 붙이지 마세요.
+    - 기존 코드의 `# [설명] ` 마커는 제거하지 마세요.
     """
 
     response = llm.invoke([HumanMessage(content=prompt)])
@@ -137,6 +143,11 @@ def run_error_analysis(code: str, error: str, user_input: str) -> tuple:
     {analysis_text}
 
     수정된 완성 코드만 반환하세요. 코드 블록 없이 순수 코드만 출력하세요.
+
+    ## 주석 규칙 (반드시 유지)
+    - 한국어 주석은 모두 `# [설명] ` 접두어를 유지하거나 새로 붙이세요.
+    - 영어 주석에는 `# [설명] ` 접두어를 붙이지 마세요.
+    - 기존 코드의 `# [설명] ` 마커는 제거하지 마세요.
     """
     fixed = coder.invoke([HumanMessage(content=fix_prompt)])
     pipeline_logger.log_step("Error Analysis", "done", output_data=fixed.content)
