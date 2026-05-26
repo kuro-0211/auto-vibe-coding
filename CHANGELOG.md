@@ -4,6 +4,60 @@
 
 ---
 
+## [v1.2] 프런트엔드 Reflex 전환 + 실시간성 강화
+
+### UI — Streamlit → Reflex 이관
+
+**배경:**
+Streamlit은 단일 페이지 rerun 모델이라 LangGraph 스트림과 결합 시 매 노드 완료마다 전체 페이지가 재구성되어 상호작용성/체감 성능이 낮았음. HITL 편집 도중 다른 위젯 클릭으로 입력이 초기화되는 부작용도 잦았음.
+
+**결정:** Reflex(React + FastAPI) 기반 SPA 대시보드로 이관 (`aria_app/`)
+- 백그라운드 이벤트(`@rx.event(background=True)`) 안에서 LangGraph `stream()` 결과를 `asyncio.to_thread + queue`로 받아 State에 점진 반영 → 새로고침 없이 노드별 결과 실시간 갱신
+- Reflex 0.9 호환: `rx.Base` 폐기 대응을 위해 import fallback 체인 추가, `rx.foreach` 중첩 제약을 피해 사이드바 히스토리를 평탄화(`HistoryFlatEntry`)
+- 컨테이너 진입점을 `reflex run`으로 교체, 마운트 볼륨 환경에서 worker churn 방지를 위해 `REFLEX_HOT_RELOAD=0`/`REFLEX_USE_GRANIAN=0`
+- 포트: `3000` (프런트) / `8000` (백엔드)
+- Legacy Streamlit 대시보드(`src/ui/dashboard.py`)는 참고용으로 보존
+
+---
+
+### Log Page — `pipeline_logger` 변화를 Reflex가 감지하지 못하는 버그 수정
+
+**증상:**
+실행을 한 번 마친 뒤 "로그" 탭을 열어도 LLM 호출 내역과 토큰 카운터가 비어 있거나 갱신되지 않음.
+
+**원인:**
+`AriaState.llm_logs` / `llm_log_total` / `llm_log_local` / `token_count`가 모두 `@rx.var`인데 내부에서 State 밖의 글로벌 `utils.logger.pipeline_logger`를 직접 읽고 있었음. Reflex는 자기 State 속성이 바뀔 때만 var 재계산/재전송을 트리거하므로 글로벌 객체의 mutation을 감지할 수 없었음.
+
+**결정:**
+- `llm_logs_data: list[dict]`, `token_usage_data: dict[str,int]`를 State 속성으로 추가
+- `_sync_pipeline_logger()` 헬퍼로 phase1/phase2 스트림 루프의 각 노드 완료 직후와 종료 시점에 `pipeline_logger` → State 미러링
+- 4개 `@rx.var`는 글로벌 대신 State 속성을 읽도록 변경 → 로그 페이지/사이드바 토큰 카운터가 실행 중에도 실시간 갱신
+
+---
+
+### Code Agent — 한국어 주석 `# [설명] ` 마커 도입
+
+**배경:**
+qwen2.5-coder가 생성한 코드의 한국어 주석이 코드 라인과 시각적으로 잘 구분되지 않아 HITL 편집창에서 어느 줄이 주석인지 한눈에 파악하기 어려웠음. 리뷰/에러수정 단계에서 마커가 임의로 벗겨지는 문제도 있었음.
+
+**결정:**
+- 생성 프롬프트: 한국어 주석은 모두 `# [설명] ` 접두어로 시작 강제, 영어 주석에는 미적용
+- 리뷰 / 에러수정 프롬프트: 기존 `# [설명] ` 마커 보존 + 새로 추가하는 한국어 주석에도 동일 규칙 적용
+- 효과: HITL 편집창에서 시각적 식별 용이 + `Ctrl+F`로 `[설명]` 검색 시 모든 주석 일괄 점프 가능
+
+---
+
+### Sandbox executor — CWD 의존 제거
+
+**배경:**
+`config/sandbox.yaml`을 CWD 기준 상대 경로로 열고 있어 Streamlit/Reflex/CLI 등 런처가 달라지면 파일을 찾지 못해 실행 실패.
+
+**결정:**
+- `executor.py`가 자기 파일 위치(`__file__`) 기준으로 프로젝트 루트를 계산해 `<root>/config/sandbox.yaml` 절대 경로로 해석
+- CWD 상대 경로는 폴백으로만 유지
+
+---
+
 ## [v1.1] 기능 완성도 향상
 
 ### Code Agent 스킵 판단 — 키워드 기반 → LLM 기반
