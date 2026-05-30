@@ -136,6 +136,115 @@ def _input_bar() -> rx.Component:
     )
 
 
+# ── project selector banner ────────────────────────────────
+def _project_selector() -> rx.Component:
+    selected_banner = rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.text(
+                    "📂 프로젝트 이어서 작업",
+                    font_size="11px",
+                    font_weight="700",
+                    color=ACCENT,
+                    text_transform="uppercase",
+                    letter_spacing="0.06em",
+                ),
+                rx.box(
+                    AriaState.selected_project_status_label,
+                    font_size="11px",
+                    font_weight="600",
+                    padding="2px 9px",
+                    border_radius="999px",
+                    background="rgba(204,120,92,0.18)",
+                    color=ACCENT,
+                ),
+                spacing="2",
+                align="center",
+            ),
+            rx.text(
+                AriaState.selected_project_name,
+                font_size="14px",
+                font_weight="600",
+                color=TEXT,
+            ),
+            rx.text(
+                "이번이 "
+                + AriaState.selected_project_next_n.to_string()
+                + "번째 세션 · 마지막: "
+                + AriaState.selected_project_last_input,
+                font_size="11px",
+                color=SUB,
+            ),
+            spacing="1",
+            align="start",
+        ),
+        background=CARD_BG,
+        border=f"1px solid {BORDER}",
+        border_radius="12px",
+        padding="14px 16px",
+        margin_bottom="10px",
+        width="100%",
+    )
+    selected_actions = rx.grid(
+        rx.button(
+            "📂  프로젝트 변경/관리",
+            on_click=rx.redirect("/project"),
+            variant="outline",
+            style={"width": "100%"},
+        ),
+        rx.button(
+            "✖  프로젝트 해제 (새 작업)",
+            on_click=AriaState.clear_project,
+            variant="outline",
+            style={"width": "100%"},
+        ),
+        columns="2",
+        spacing="2",
+        width="100%",
+        margin_bottom="16px",
+    )
+    empty_banner = rx.grid(
+        rx.box(
+            rx.vstack(
+                rx.text(
+                    "현재 모드",
+                    font_size="11px",
+                    font_weight="700",
+                    color=SUB,
+                    text_transform="uppercase",
+                    letter_spacing="0.06em",
+                ),
+                rx.text(
+                    "✨ 새 작업으로 실행 (프로젝트 없음)",
+                    font_size="13px",
+                    color=TEXT,
+                ),
+                spacing="1",
+                align="start",
+            ),
+            background=CARD_BG,
+            border=f"1px solid {BORDER}",
+            border_radius="12px",
+            padding="12px 14px",
+        ),
+        rx.button(
+            "📂  프로젝트 선택해서 이어 실행",
+            on_click=rx.redirect("/project"),
+            variant="outline",
+            style={"width": "100%", "height": "100%"},
+        ),
+        columns="2",
+        spacing="2",
+        width="100%",
+        margin_bottom="16px",
+    )
+    return rx.cond(
+        AriaState.has_selected_project,
+        rx.vstack(selected_banner, selected_actions, spacing="0", width="100%"),
+        empty_banner,
+    )
+
+
 # ── idle screen ─────────────────────────────────────────────
 def _example_card(ex: str) -> rx.Component:
     return rx.button(
@@ -635,6 +744,7 @@ def run_page() -> rx.Component:
     body = rx.vstack(
         page_header("ARIA", AriaState.phase_label),
         _error_banner(),
+        rx.cond(AriaState.is_idle, _project_selector(), rx.fragment()),
         rx.cond(AriaState.is_idle, _idle_view(), rx.fragment()),
         rx.cond(AriaState.is_running_phase1, _running_phase1_view(), rx.fragment()),
         rx.cond(AriaState.is_phase1_done, _hitl_view(), rx.fragment()),

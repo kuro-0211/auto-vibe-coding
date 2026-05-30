@@ -26,10 +26,25 @@ def _get_school_client():
         base_url=os.getenv("SCHOOL_API_BASE_URL")
     )
 
-def run_code_generation(user_input: str, research_result: str) -> str:
+def run_code_generation(
+    user_input: str,
+    research_result: str,
+    previous_code: str | None = None,
+) -> str:
     pipeline_logger.log_step("Code Generation", "running", input_data=user_input)
 
     llm = _get_ollama_coder()
+
+    # 이전 세션 코드가 있으면 프롬프트에 포함하여 이어 작성하도록 유도
+    prev_block = ""
+    if previous_code and previous_code.strip():
+        prev_block = f"""
+    ## 이전 세션 코드 (이어서 작업)
+    {previous_code}
+
+    위 코드를 기반으로 이번 요청을 반영해 확장/수정하세요.
+    기존 구조를 임의로 갈아엎지 말고, 필요한 부분만 추가/변경하세요.
+"""
 
     prompt = f"""
     다음 요청에 맞는 코드를 작성해주세요.
@@ -39,7 +54,7 @@ def run_code_generation(user_input: str, research_result: str) -> str:
 
     ## 리서치 결과 (참고용)
     {research_result}
-
+{prev_block}
     ## 요구사항
     - 실행 가능한 완성된 코드만 작성
     - 한국어 주석을 포함하되, 모든 한국어 주석은 반드시 `# [설명] `(또는 들여쓰기 후 `# [설명] `) 접두어로 시작

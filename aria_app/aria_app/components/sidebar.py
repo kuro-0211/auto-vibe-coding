@@ -187,6 +187,7 @@ def sidebar() -> rx.Component:
         _history_section(),
         _divider(),
         rx.vstack(
+            _nav_button("📂", "프로젝트", "/project", "project"),
             _nav_button("📊", "모니터링", "/monitor", "monitor"),
             _nav_button("📝", "로그", "/log", "log"),
             _nav_button("⏰", "스케줄", "/schedule", "schedule"),

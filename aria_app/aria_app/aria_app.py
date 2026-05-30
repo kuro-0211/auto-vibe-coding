@@ -10,6 +10,8 @@ from .pages.monitor import monitor_page
 from .pages.log_page import log_page
 from .pages.schedule_page import schedule_page
 from .pages.history_detail import history_detail_page
+from .pages.project_page import project_page
+from .pages.project_detail import project_detail_page
 from .state import AriaState
 from .theme import BG, FONT_STACK, TEXT
 
@@ -45,4 +47,11 @@ app.add_page(
     route="/history/[hid]",
     title="ARIA · 히스토리",
     on_load=AriaState.load_history_detail,
+)
+app.add_page(project_page, route="/project", title="ARIA · 프로젝트", on_load=AriaState.on_load)
+app.add_page(
+    project_detail_page,
+    route="/project/[pid]",
+    title="ARIA · 프로젝트 상세",
+    on_load=AriaState.load_project_detail,
 )

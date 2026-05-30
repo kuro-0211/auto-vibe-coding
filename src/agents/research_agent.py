@@ -6,7 +6,11 @@ from tavily import TavilyClient
 from openai import OpenAI
 from utils.logger import pipeline_logger
 
-def run_research(user_input: str) -> str:
+def run_research(
+    user_input: str,
+    previous_context: str | None = None,
+    session_number: int = 1,
+) -> str:
     pipeline_logger.log_step("Research Agent", "running", input_data=user_input)
 
     tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
@@ -41,8 +45,23 @@ def run_research(user_input: str) -> str:
     )
 
     today = datetime.now().strftime("%Y-%m-%d")
-    prompt = f"""당신은 검색 결과 정리 보조입니다.
 
+    # 이전 세션 컨텍스트가 있으면 프롬프트 앞부분에 명시
+    prev_block = ""
+    if previous_context:
+        snippet = previous_context.strip()
+        if len(snippet) > 1200:
+            snippet = snippet[:1200] + "…"
+        prev_block = f"""
+# 이전 세션 컨텍스트 (세션 {max(session_number - 1, 1)}번까지의 누적)
+{snippet}
+
+이번은 {session_number}번째 세션입니다. 위 컨텍스트를 이어받아
+이번 사용자 질의에 새로 추가될 내용만 정리하세요.
+"""
+
+    prompt = f"""당신은 검색 결과 정리 보조입니다.
+{prev_block}
 # 현재 날짜
 {today}
 

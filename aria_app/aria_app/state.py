@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover
 
 # These imports resolve because aria_app/__init__.py prepends ../../src.
 from agents.output_agent import export_to_docx, export_to_pdf
+from utils import project_manager as pm
 from utils import scheduler as sched_mod
 from utils.history import (
     clear_history,
@@ -133,6 +134,43 @@ class PipelineStepView(_RxBase):
     status: str = "idle"
 
 
+# ── 프로젝트 ───────────────────────────────────────────────
+PROJECT_STATUS_LABELS = {
+    "active": "진행중",
+    "completed": "완료",
+    "paused": "중단",
+}
+
+
+class ProjectView(_RxBase):
+    id: int = 0
+    name: str = ""
+    description: str = ""
+    status: str = "active"
+    status_label: str = "진행중"
+    session_count: int = 0
+    last_at: str = "—"
+    is_selected: bool = False
+
+
+class SessionView(_RxBase):
+    id: int = 0
+    session_number: int = 0
+    preview: str = ""
+    created_at: str = ""
+    success: bool = False
+    final_output: str = ""
+    research_result: str = ""
+    code_result: str = ""
+    error_analysis: str = ""
+    has_exec: bool = False
+    exec_ok: bool = False
+    exec_output: str = ""
+    exec_error: str = ""
+    exec_elapsed: int = 0
+    exec_lines: int = 0
+
+
 class AriaState(rx.State):
     # ── session / phase ────────────────────────────────────
     session_id: str = ""
@@ -198,6 +236,17 @@ class AriaState(rx.State):
     s_send_email: bool = False
     s_email_format: str = "pdf"
     s_flash: str = ""
+
+    # ── projects ──────────────────────────────────────────
+    selected_project_id: int = 0           # 0 = 선택 안 함
+    selected_project_detail_id: int = 0    # 상세 페이지에서 보고 있는 프로젝트
+    projects_data: list[dict] = []         # 전체 프로젝트 raw
+    project_sessions_data: list[dict] = []  # 상세 페이지의 세션 raw
+    selected_project_detail_data: dict = {}
+
+    # 새 프로젝트 폼
+    p_name: str = ""
+    p_description: str = ""
 
     # ── computed ──────────────────────────────────────────
     @rx.var
@@ -443,6 +492,160 @@ class AriaState(rx.State):
     def llm_log_local(self) -> int:
         return len([l for l in self.llm_logs_data if "gpt" not in (l.get("model") or "")])
 
+    # ── project computed ─────────────────────────────────
+    @rx.var
+    def has_selected_project(self) -> bool:
+        return bool(self.selected_project_id)
+
+    @rx.var
+    def selected_project_name(self) -> str:
+        pid = self.selected_project_id
+        if not pid:
+            return ""
+        for p in self.projects_data:
+            if int(p.get("id") or 0) == int(pid):
+                return str(p.get("name") or "")
+        return ""
+
+    @rx.var
+    def selected_project_status_label(self) -> str:
+        pid = self.selected_project_id
+        if not pid:
+            return ""
+        for p in self.projects_data:
+            if int(p.get("id") or 0) == int(pid):
+                return PROJECT_STATUS_LABELS.get(p.get("status") or "active", "진행중")
+        return "진행중"
+
+    @rx.var
+    def selected_project_next_n(self) -> int:
+        pid = self.selected_project_id
+        if not pid:
+            return 1
+        for p in self.projects_data:
+            if int(p.get("id") or 0) == int(pid):
+                return int(p.get("session_count") or 0) + 1
+        return 1
+
+    @rx.var
+    def selected_project_last_input(self) -> str:
+        pid = self.selected_project_id
+        if not pid:
+            return ""
+        try:
+            latest = pm.get_latest_session(int(pid)) or {}
+            inp = (latest.get("user_input") or "").strip()
+            if len(inp) > 40:
+                inp = inp[:40] + "…"
+            return inp or "—"
+        except Exception:
+            return "—"
+
+    @rx.var
+    def projects_view(self) -> list[ProjectView]:
+        out: list[ProjectView] = []
+        for p in self.projects_data:
+            pid = int(p.get("id") or 0)
+            last_at = (p.get("last_session_at") or p.get("updated_at") or "") or "—"
+            if last_at and last_at != "—":
+                last_at = last_at.replace("T", " ")[:16]
+            out.append(
+                ProjectView(
+                    id=pid,
+                    name=str(p.get("name") or ""),
+                    description=str(p.get("description") or ""),
+                    status=str(p.get("status") or "active"),
+                    status_label=PROJECT_STATUS_LABELS.get(p.get("status") or "active", "진행중"),
+                    session_count=int(p.get("session_count") or 0),
+                    last_at=last_at,
+                    is_selected=(pid == int(self.selected_project_id or 0)),
+                )
+            )
+        return out
+
+    @rx.var
+    def has_projects(self) -> bool:
+        return len(self.projects_data) > 0
+
+    @rx.var
+    def project_detail_name(self) -> str:
+        return str((self.selected_project_detail_data or {}).get("name") or "")
+
+    @rx.var
+    def project_detail_description(self) -> str:
+        return str((self.selected_project_detail_data or {}).get("description") or "—")
+
+    @rx.var
+    def project_detail_status(self) -> str:
+        return str((self.selected_project_detail_data or {}).get("status") or "active")
+
+    @rx.var
+    def project_detail_status_label(self) -> str:
+        return PROJECT_STATUS_LABELS.get(
+            (self.selected_project_detail_data or {}).get("status") or "active",
+            "진행중",
+        )
+
+    @rx.var
+    def project_detail_created(self) -> str:
+        return str((self.selected_project_detail_data or {}).get("created_at") or "").replace("T", " ")[:16]
+
+    @rx.var
+    def project_detail_updated(self) -> str:
+        return str((self.selected_project_detail_data or {}).get("updated_at") or "").replace("T", " ")[:16]
+
+    @rx.var
+    def project_detail_exists(self) -> bool:
+        return bool(self.selected_project_detail_data)
+
+    @rx.var
+    def sessions_view(self) -> list[SessionView]:
+        out: list[SessionView] = []
+        for s in self.project_sessions_data:
+            preview = (s.get("user_input") or "").strip()
+            preview_short = preview[:60] + ("…" if len(preview) > 60 else "")
+            if not preview_short:
+                preview_short = "(빈 입력)"
+            exec_r = s.get("execution_result") or {}
+            if isinstance(exec_r, dict):
+                has_exec = bool(exec_r)
+                exec_ok = bool(exec_r.get("success"))
+                exec_output = str(exec_r.get("output") or "")
+                exec_error = str(exec_r.get("error") or "")
+                exec_elapsed = int(exec_r.get("elapsed") or 0)
+                exec_lines = int(exec_r.get("lines") or 0)
+            else:
+                has_exec = False
+                exec_ok = False
+                exec_output = ""
+                exec_error = ""
+                exec_elapsed = 0
+                exec_lines = 0
+            out.append(
+                SessionView(
+                    id=int(s.get("id") or 0),
+                    session_number=int(s.get("session_number") or 0),
+                    preview=preview_short,
+                    created_at=str(s.get("created_at") or "").replace("T", " ")[:16],
+                    success=bool(s.get("success")),
+                    final_output=str(s.get("final_output") or ""),
+                    research_result=str(s.get("research_result") or ""),
+                    code_result=str(s.get("code_result") or ""),
+                    error_analysis=str(s.get("error_analysis") or ""),
+                    has_exec=has_exec,
+                    exec_ok=exec_ok,
+                    exec_output=exec_output,
+                    exec_error=exec_error,
+                    exec_elapsed=exec_elapsed,
+                    exec_lines=exec_lines,
+                )
+            )
+        return out
+
+    @rx.var
+    def has_sessions(self) -> bool:
+        return len(self.project_sessions_data) > 0
+
     @rx.var
     def llm_logs(self) -> list[LlmLogView]:
         out: list[LlmLogView] = []
@@ -464,6 +667,19 @@ class AriaState(rx.State):
             self.session_id = str(uuid.uuid4())
         self._refresh_history()
         self._refresh_schedule()
+        self._refresh_projects()
+
+    def load_project_detail(self):
+        pid_raw = self.router.page.params.get("pid", "")
+        try:
+            pid = int(pid_raw)
+        except Exception:
+            self.selected_project_detail_id = 0
+            self.selected_project_detail_data = {}
+            self.project_sessions_data = []
+            return
+        self.selected_project_detail_id = pid
+        self._refresh_project_detail()
 
     def load_history_detail(self):
         hid_raw = self.router.page.params.get("hid", "")
@@ -512,6 +728,30 @@ class AriaState(rx.State):
             self.schedule_items = []
             self.scheduler_running = False
 
+    def _refresh_projects(self):
+        try:
+            self.projects_data = [dict(x) for x in pm.get_projects()]
+        except Exception:
+            self.projects_data = []
+
+    def _refresh_project_detail(self):
+        pid = int(self.selected_project_detail_id or 0)
+        if not pid:
+            self.selected_project_detail_data = {}
+            self.project_sessions_data = []
+            return
+        try:
+            proj = pm.get_project(pid)
+            self.selected_project_detail_data = dict(proj) if proj else {}
+            full_sessions: list[dict] = []
+            for s in pm.get_sessions(pid):
+                detail = pm.get_session(int(s["id"])) or {}
+                full_sessions.append(dict(detail))
+            self.project_sessions_data = full_sessions
+        except Exception:
+            self.selected_project_detail_data = {}
+            self.project_sessions_data = []
+
     # ── reset / nav ───────────────────────────────────────
     def reset_run_state(self, prefill: str = ""):
         self.session_id = str(uuid.uuid4())
@@ -544,6 +784,80 @@ class AriaState(rx.State):
 
     def new_chat(self):
         self.reset_run_state()
+        return rx.redirect("/")
+
+    # ── project actions ──────────────────────────────────
+    def set_p_name(self, v: str):
+        self.p_name = v
+
+    def set_p_description(self, v: str):
+        self.p_description = v
+
+    def submit_project(self):
+        name = (self.p_name or "").strip()
+        if not name:
+            return rx.toast.warning("프로젝트 이름을 입력해주세요.")
+        try:
+            new_id = pm.create_project(name, (self.p_description or "").strip())
+        except Exception as e:
+            return rx.toast.error(f"생성 실패: {e}")
+        self.p_name = ""
+        self.p_description = ""
+        self.selected_project_id = int(new_id)
+        self._refresh_projects()
+        return rx.toast.success(f"프로젝트 #{new_id} '{name}' 생성 완료")
+
+    def select_project(self, pid: int):
+        self.selected_project_id = int(pid)
+        self._refresh_projects()
+        self.reset_run_state()
+        self.selected_project_id = int(pid)  # reset 후 다시 세팅
+        return rx.redirect("/")
+
+    def clear_project(self):
+        self.selected_project_id = 0
+
+    def view_project(self, pid: int):
+        self.selected_project_detail_id = int(pid)
+        return rx.redirect(f"/project/{int(pid)}")
+
+    def delete_project(self, pid: int):
+        try:
+            pm.delete_project(int(pid))
+        except Exception as e:
+            return rx.toast.error(f"삭제 실패: {e}")
+        if int(self.selected_project_id or 0) == int(pid):
+            self.selected_project_id = 0
+        self._refresh_projects()
+        return rx.toast.success(f"프로젝트 #{pid} 삭제됨")
+
+    def toggle_project_completed(self, pid: int):
+        try:
+            proj = pm.get_project(int(pid)) or {}
+            new_status = "completed" if proj.get("status") != "completed" else "active"
+            pm.update_project_status(int(pid), new_status)
+        except Exception as e:
+            return rx.toast.error(f"상태 변경 실패: {e}")
+        self._refresh_projects()
+        self._refresh_project_detail()
+
+    def toggle_project_paused(self, pid: int):
+        try:
+            proj = pm.get_project(int(pid)) or {}
+            new_status = "active" if proj.get("status") == "paused" else "paused"
+            pm.update_project_status(int(pid), new_status)
+        except Exception as e:
+            return rx.toast.error(f"상태 변경 실패: {e}")
+        self._refresh_projects()
+        self._refresh_project_detail()
+
+    def continue_project_from_detail(self):
+        pid = int(self.selected_project_detail_id or 0)
+        if not pid:
+            return
+        self.selected_project_id = pid
+        self.reset_run_state()
+        self.selected_project_id = pid
         return rx.redirect("/")
 
     # ── input form (run page) ─────────────────────────────
@@ -601,8 +915,9 @@ class AriaState(rx.State):
             send_email = self.send_email
             email_format = self.email_format
             start_time = self.start_time
+            project_id = int(self.selected_project_id or 0)
 
-        await self._stream_phase1(text, session_id, send_email, email_format, start_time)
+        await self._stream_phase1(text, session_id, send_email, email_format, start_time, project_id)
 
     async def _stream_phase1(
         self,
@@ -611,7 +926,21 @@ class AriaState(rx.State):
         send_email: bool,
         email_format: str,
         start_time: float,
+        project_id: int = 0,
     ):
+        # 프로젝트 컨텍스트 (이전 코드/리서치) 조회
+        prev_code: Optional[str] = None
+        prev_context: Optional[str] = None
+        session_number = 1
+        if project_id:
+            try:
+                ctx = pm.get_project_context(project_id) or {}
+                prev_code = ctx.get("previous_code")
+                prev_context = ctx.get("previous_context")
+                session_number = int(ctx.get("session_number") or 1)
+            except Exception:
+                pass
+
         initial_state = {
             "user_input": text,
             "send_email": send_email,
@@ -626,6 +955,10 @@ class AriaState(rx.State):
             "needs_code": None,
             "edited_code": None,
             "start_time": start_time,
+            "project_id": project_id if project_id else None,
+            "previous_code": prev_code,
+            "previous_context": prev_context,
+            "session_number": session_number,
         }
         config = {"configurable": {"thread_id": session_id}}
 
@@ -685,6 +1018,8 @@ class AriaState(rx.State):
             if ls.get("final_output") and not ls.get("code_result"):
                 self.result = ls
                 self.phase = "phase2_done"
+                self._refresh_history()
+                self._refresh_projects()
             else:
                 self.phase = "phase1_done"
                 self.edited_code = ls.get("code_result", "") or ""
@@ -771,6 +1106,7 @@ class AriaState(rx.State):
             self.phase = "phase2_done"
             self._sync_pipeline_logger()
             self._refresh_history()
+            self._refresh_projects()
 
     # ── downloads ─────────────────────────────────────────
     def download_pdf(self):

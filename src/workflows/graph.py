@@ -27,11 +27,20 @@ class AgentState(TypedDict):
     email_format: Optional[str]
     edited_code: Optional[str]
     start_time: Optional[float]
+    # ── 멀티스텝 프로젝트 컨텍스트 ──────────────────────
+    project_id: Optional[int]
+    previous_code: Optional[str]
+    previous_context: Optional[str]
+    session_number: int
 
 # ── 노드 함수 ──────────────────────────────────────────────
 def research_node(state: AgentState) -> AgentState:
     print("🔍 Research Agent 실행 중...")
-    result = run_research(state["user_input"])
+    result = run_research(
+        state["user_input"],
+        previous_context=state.get("previous_context"),
+        session_number=state.get("session_number", 1),
+    )
     return {**state, "research_result": result}
 
 def code_decision_node(state: AgentState) -> AgentState:
@@ -85,7 +94,8 @@ def code_generation_node(state: AgentState) -> AgentState:
     print("🦙 Ollama 코드 생성 중...")
     code = run_code_generation(
         user_input=state["user_input"],
-        research_result=state["research_result"]
+        research_result=state["research_result"],
+        previous_code=state.get("previous_code"),
     )
     return {**state, "code_result": code, "error": None, "human_approved": None}
 
@@ -162,6 +172,16 @@ def output_node(state: AgentState) -> AgentState:
         print("🕒 실행 히스토리 저장 완료")
     except Exception as e:
         print(f"⚠️ 히스토리 저장 실패: {e}")
+
+    # 프로젝트가 선택된 경우 세션 자동 저장
+    project_id = new_state.get("project_id")
+    if project_id:
+        try:
+            from utils.project_manager import save_session
+            sid = save_session(int(project_id), new_state)
+            print(f"📂 프로젝트 세션 #{sid} 저장 완료 (project_id={project_id})")
+        except Exception as e:
+            print(f"⚠️ 프로젝트 세션 저장 실패: {e}")
 
     return new_state
 
