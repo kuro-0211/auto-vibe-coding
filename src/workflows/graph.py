@@ -5,6 +5,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import TypedDict, Optional
 from agents.research_agent import run_research
 from agents.code_agent import run_code_generation, run_code_review, run_error_analysis
+from agents.decision_agent import decide_needs_code
 from agents.output_agent import run_output
 from agents.email_agent import run_email
 from sandbox.executor import execute_code
@@ -44,49 +45,7 @@ def research_node(state: AgentState) -> AgentState:
     return {**state, "research_result": result}
 
 def code_decision_node(state: AgentState) -> AgentState:
-    from openai import OpenAI
-    import json
-    import os
-
-    try:
-        client = OpenAI(
-            api_key=os.getenv("SCHOOL_API_KEY"),
-            base_url=os.getenv("SCHOOL_API_BASE_URL")
-        )
-
-        response = client.chat.completions.create(
-            model=os.getenv("SCHOOL_MODEL", "gpt-5.4-mini"),
-            temperature=1,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "사용자 요청이 코드 생성이 필요한지 판단하세요. 반드시 JSON으로만 응답: {\"needs_code\": true} 또는 {\"needs_code\": false}"
-                },
-                {
-                    "role": "user",
-                    "content": f"요청: {state['user_input']}"
-                }
-            ]
-        )
-
-        content = response.choices[0].message.content
-        if content is None:
-            raise ValueError("응답이 None")
-
-        content = content.strip()
-        if "true" in content.lower():
-            needs_code = True
-        elif "false" in content.lower():
-            needs_code = False
-        else:
-            result = json.loads(content)
-            needs_code = result.get("needs_code", False)
-
-    except Exception as e:
-        print(f"⚠️ code_decision 오류, 키워드 방식으로 폴백: {e}")
-        keywords = ["코드", "만들어", "구현", "작성", "짜줘", "개발", "프로그램", "스크립트", "함수", "클래스"]
-        needs_code = any(k in state["user_input"] for k in keywords)
-
+    needs_code = decide_needs_code(state["user_input"])
     print(f"💡 코드 생성 필요: {needs_code}")
     return {**state, "needs_code": needs_code}
 
@@ -143,16 +102,6 @@ def error_analysis_node(state: AgentState) -> AgentState:
         "code_result": fixed_code,
         "retry_count": retry,
         "error_analysis": analysis_text,
-    }
-
-    # 에러 분석 결과 저장
-    error_analysis = getattr(builtins, "_last_error_analysis", "")
-
-    return {
-        **state,
-        "code_result": fixed_code,
-        "retry_count": retry,
-        "error": error_analysis,
     }
 
 def output_node(state: AgentState) -> AgentState:

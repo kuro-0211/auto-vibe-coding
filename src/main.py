@@ -22,13 +22,23 @@ def main():
     initial_state = {
         "user_input": user_input,
         "send_email": send_email,
+        "email_format": "none",
         "research_result": None,
         "code_result": None,
         "execution_result": None,
         "final_output": None,
         "error": None,
+        "error_analysis": None,
         "retry_count": 0,
         "needs_code": None,
+        "human_approved": None,
+        "edited_code": None,
+        "start_time": None,
+        # 멀티스텝 프로젝트 컨텍스트 (CLI는 프로젝트 미사용)
+        "project_id": None,
+        "previous_code": None,
+        "previous_context": None,
+        "session_number": 1,
     }
 
     print("\n⚙️  파이프라인 실행 중...\n")
