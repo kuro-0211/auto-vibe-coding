@@ -39,15 +39,15 @@
 
 ## 🟡 검토 중
 
-### [ISSUE-005] 멀티스텝 세션 영속화 (UI 레벨) 미구현
-- **현황:** LangGraph `SqliteSaver`는 `data/checkpoints.db`에 노드 완료 단위로 체크포인트를 저장하고 있으나, Reflex `AriaState`(`session_id`, `phase`, `phase1_result`, `agent_logs`, `llm_logs_data`, `step_status` 등)는 인메모리라 새로고침/서버 재시작 시 전부 소실
-- **위험 시나리오:** HITL 편집창에서 한참 코드를 수정하다 새로고침으로 입력이 통째로 날아감
+### [ISSUE-005] In-progress AriaState 영속화 (HITL 편집 손실 방지) 미구현
+- **현황:** v1.3에서 *완료된* 세션은 `data/projects.db`에 영속화되어 프로젝트 선택 시 `previous_code` / `previous_context`로 다음 세션에 자동 전파됨. 그러나 진행 *중간*의 Reflex `AriaState`(`phase1_result`, `agent_logs`, `llm_logs_data`, `step_status`, HITL `edited_code` 등)는 여전히 인메모리라 새로고침/서버 재시작 시 소실
+- **남은 위험 시나리오:** HITL 편집창에서 한참 코드를 수정하다 새로고침으로 입력이 통째로 날아감
 - **필요 작업:**
   - `session_id`를 쿠키/localStorage로 보존
   - `on_load`에서 체크포인터 thread를 조회해 `phase1_result`/`phase`를 복구
   - `agent_logs` / `llm_logs_data`는 그래프 state 밖이라 sidecar 테이블(session_id 키)에 별도 저장·복구
   - phase 실행 도중 새로고침은 노드 중간 인터럽트라 LangGraph로도 살릴 수 없음 → 마지막 완료 노드부터 "재시작" 버튼 제공
-- **우선순위:** 중간 (HITL 편집 손실 방지 효과)
+- **우선순위:** 중간 (멀티스텝 영속화는 v1.3에서 해결, HITL 편집 손실은 별개 이슈로 잔존)
 
 ---
 
@@ -120,3 +120,16 @@
 ### [RESOLVED-018] 샌드박스 executor가 CWD에 따라 sandbox.yaml을 못 찾음
 - **증상:** Streamlit/Reflex/CLI 등 런처가 달라지면 `config/sandbox.yaml` 로딩 실패
 - **해결:** `executor.py`가 `__file__` 기준으로 프로젝트 루트를 계산해 절대 경로로 yaml 해석, CWD 상대 경로는 폴백으로만 유지
+
+### [RESOLVED-019] 누적 코드 작업 시 이전 세션 컨텍스트가 사라짐
+- **증상:** "FastAPI 서버 만들어줘" → "여기에 JWT 인증 추가해줘"를 두 번에 나눠 입력하면 두 번째 실행이 이전 코드를 모른 채 처음부터 새로 작성
+- **원인:** 실행 단위가 stateless. `history.db`에는 결과가 쌓이지만 다음 실행 프롬프트에 자동 주입되는 경로가 없었음
+- **해결:** v1.3에서 `data/projects.db`(projects/sessions) + `src/utils/project_manager.py` + `AgentState`(project_id/previous_code/previous_context/session_number) 추가. Reflex 사이드바 `📂 프로젝트` 탭에서 생성/선택하면 다음 실행이 이전 세션의 코드·리서치를 컨텍스트로 자동 포함
+
+### [RESOLVED-020] Streamlit dashboard.py 잔존 (v1.2 Reflex 전환 후 legacy 보존)
+- **증상:** Reflex 전환 후 `src/ui/dashboard.py`(1083 LOC)가 참고용으로 남아 있어 두 UI를 함께 유지해야 한다는 오해 유발
+- **해결:** v1.3에서 완전 삭제. UI 소스는 Reflex `aria_app/` 하나만 권위 있는 단일 소스가 됨
+
+### [RESOLVED-021] Output Agent의 LLM 재가공이 사실 변형/출처 누락 위험
+- **증상:** `research_agent`(GPT-5.4-mini)가 환각 억제 + 출처 강제 규칙 아래 `## 핵심 요약 / ## 주요 내용 / ## 참고 출처`로 정리한 결과를, `output_agent`(gemma3:4b)가 마지막에 또 한 번 자연어로 풀어쓰는 구조였음. 두 가지 폴리시 레벨이 섞여 인용이 빠지거나 숫자가 미세하게 비틀리는 경우 발생. 코드 케이스에선 코드·실행 결과까지 풀어쓰면서 UI에 같은 내용이 중복 표시
+- **해결:** v1.3.1에서 `run_output()`을 LLM 없는 순수 템플릿 조립으로 전환. 리서치 케이스는 `research_result` 그대로 반환, 코드 케이스는 `# 실행 결과` + 실패 시 `## 에러 분석` + `# 참고 리서치` 섹션 마크다운 조립. UI에서 중복되던 "🔍 리서치 결과" 아코디언도 제거. 부수 효과로 마지막 노드의 gemma3:4b 호출 1회 제거되어 완료 체감 속도 향상

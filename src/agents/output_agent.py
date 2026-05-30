@@ -4,74 +4,77 @@ import re
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv("/app/.env")
-from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage
 from utils.logger import pipeline_logger
 
 OUTPUT_DIR = "/app/data/outputs"
 
 
 def run_output(state: dict) -> str:
+    """최종 결과 문서를 LLM 호출 없이 템플릿으로 조립한다.
+
+    - 리서치 전용 케이스: GPT가 이미 정리한 research_result를 그대로 반환.
+    - 코드 케이스: 실행 결과 요약 + (실패 시 에러 분석) + 참고 리서치를
+      마크다운 섹션으로 조립. 코드 본문은 별도 필드(code_result)로 UI/PDF에
+      이미 노출되므로 final_output에는 포함하지 않는다.
+
+    이전 버전은 gemma3:4b로 한 번 더 다듬었지만, research_agent가 GPT-5.4-mini로
+    이미 환각 억제 + 출처 강제 규칙 아래 정리한 결과를 작은 모델로 재가공하면
+    출처가 떨어지거나 사실이 미세하게 비틀릴 위험만 늘었음. v1.3.1에서 제거.
+    """
     pipeline_logger.log_step("Output Agent", "running")
 
-    llm = ChatOllama(
-        model=os.getenv("GEMMA_MODEL", "gemma3:4b"),
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
-        temperature=0.3
-    )
-
-    research = state.get("research_result", "")
-    code = state.get("code_result", "")
+    research = (state.get("research_result") or "").strip()
+    code = (state.get("code_result") or "").strip()
     execution = state.get("execution_result")
-    retry_count = state.get("retry_count", 0)
+    error_analysis = (state.get("error_analysis") or "").strip()
+    retry_count = int(state.get("retry_count") or 0)
 
-    if execution and isinstance(execution, dict):
+    # ── 리서치 전용 케이스 ──────────────────────────────
+    if not code:
+        result = research or "결과 없음"
+        pipeline_logger.log_step("Output Agent", "done", output_data=result)
+        return result
+
+    # ── 코드 케이스: 마크다운 섹션 조립 ────────────────
+    parts: list[str] = []
+
+    if isinstance(execution, dict):
         if execution.get("success"):
-            exec_summary = f"실행 성공\n{execution.get('output', '')}"
+            elapsed = execution.get("elapsed", 0)
+            lines = execution.get("lines", 0)
+            output_text = (execution.get("output") or "").rstrip()
+            parts.append("# 실행 결과")
+            parts.append(f"✅ 실행 성공 · ⏱ {elapsed}s · 📄 {lines}줄")
+            if output_text:
+                parts.append("")
+                parts.append("```")
+                parts.append(output_text)
+                parts.append("```")
         else:
-            exec_summary = f"실행 실패 ({retry_count}회 시도)\n{execution.get('error', '')}"
+            err = (execution.get("error") or "").rstrip()
+            parts.append("# 실행 결과")
+            parts.append(f"❌ 실행 실패 ({retry_count}회 시도)")
+            if err:
+                parts.append("")
+                parts.append("```")
+                parts.append(err)
+                parts.append("```")
+            if error_analysis:
+                parts.append("")
+                parts.append("## 에러 분석")
+                parts.append(error_analysis)
     else:
-        exec_summary = "코드 실행 없음"
+        parts.append("# 실행 결과")
+        parts.append("코드 실행 없음")
 
-    prompt = f"""
-다음 내용을 바탕으로 최종 결과 문서를 작성해주세요.
+    if research:
+        parts.append("")
+        parts.append("# 참고 리서치")
+        parts.append(research)
 
-## 리서치 결과
-{research}
-
-## 생성된 코드
-{code if code else "코드 생성 없음"}
-
-## 실행 결과
-{exec_summary}
-
-## 출력 형식
-# 결과 요약
-(핵심 내용 3~5줄)
-
-## 리서치 내용
-(정리된 내용)
-
-## 코드
-(생성된 코드, 있는 경우)
-
-## 실행 결과
-(실행 결과, 있는 경우)
-
-한국어로 작성하세요.
-"""
-
-    response = llm.invoke([HumanMessage(content=prompt)])
-
-    pipeline_logger.log_llm(
-        model="gemma3:4b",
-        prompt=prompt,
-        response=response.content,
-        tokens=0
-    )
-    pipeline_logger.log_step("Output Agent", "done", output_data=response.content)
-
-    return response.content
+    result = "\n".join(parts) if parts else "결과 없음"
+    pipeline_logger.log_step("Output Agent", "done", output_data=result)
+    return result
 
 
 def _ensure_output_dir() -> str:

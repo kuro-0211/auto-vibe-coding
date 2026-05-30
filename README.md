@@ -35,6 +35,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 - 📧 이메일 자동 발송 + 첨부파일 (네이버 SMTP)
 - 🕒 실행 히스토리 자동 저장 + 과거 결과 PDF/Word/MD로 다시 다운로드
 - ⏰ 스케줄링 자동 실행 (매시간 / 매일 / 매주 / 매월, Asia/Seoul 기준)
+- 📂 **멀티스텝 프로젝트 관리** — 한 프로젝트 안에 N개 세션을 누적해 이전 코드/리서치를 다음 실행에 자동 컨텍스트로 전파 (예: 1단계 FastAPI 서버 → 2단계 JWT 인증 → 3단계 DB 연결)
 
 ---
 
@@ -51,6 +52,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 | 파일 출력 | ❌ 텍스트만 | ✅ PDF / Word / Markdown |
 | 이력 보존 | ❌ 세션 종료 시 소실 | ✅ SQLite 영속 저장 |
 | 정기 자동 실행 | ❌ 매번 수동 입력 | ✅ APScheduler 스케줄링 |
+| 누적 작업 컨텍스트 | ❌ 매번 새 대화 | ✅ 프로젝트 단위 멀티스텝 누적 |
 
 ---
 
@@ -78,7 +80,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
                        → 승인 후 Docker 샌드박스 실행
                        → 실패 시 gemma3:4b 에러 분석 → 재생성 (최대 3회)
     ↓
-④ Output Agent     — gemma3:4b 문서 정리 + 결과 출력
+④ Output Agent     — 템플릿 조립 (LLM 호출 없이 실행 결과 + 리서치 섹션 합성)
     ↓
 ⑤ 파일 변환        — PDF (fpdf2 + NanumGothic) / Word (python-docx) / Markdown
     ↓
@@ -96,7 +98,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 | **웹 검색** | Tavily API | 실시간 웹 검색 (신뢰 도메인 우선) |
 | **Cloud LLM** | GPT-5.4 (학교 API) | 리서치 정리, 코드 생성 필요 여부 판단 |
 | **Local LLM** | qwen2.5-coder | 코드 생성, 코드 리뷰, 코드 수정 |
-| **Local LLM** | gemma3:4b | 문서 작성, 에러 분석 |
+| **Local LLM** | gemma3:4b | 에러 분석 (실패 시) |
 | **GPU** | NVIDIA RTX 3080 | 로컬 추론 가속 |
 | **샌드박스** | Docker | 보안 격리 코드 실행 환경 |
 | **UI** | Reflex (React + FastAPI) | 사이드바 기반 대시보드, 실시간 스트리밍 |
@@ -107,6 +109,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 | **세션 저장** | LangGraph SqliteSaver | Checkpointer 기반 세션 관리 |
 | **히스토리** | SQLite (`history.db`) | 모든 실행 결과 영속 저장 |
 | **스케줄 저장** | SQLite (`schedule.db`) | 등록된 스케줄 영속 저장 |
+| **프로젝트 저장** | SQLite (`projects.db`) | 멀티스텝 프로젝트/세션 누적 (이전 코드·리서치 컨텍스트 자동 전파) |
 
 ---
 
@@ -116,7 +119,7 @@ ARIA는 사용자의 키워드나 목적을 입력받아 리서치와 코드 생
 |---|---|---|---|
 | **GPT-5.4** | gpt-5.4 | 리서치 정리, 코드 생성 판단 | 학교 API |
 | **Ollama (코더)** | qwen2.5-coder | 코드 생성, 코드 리뷰, 수정 | 무료 (로컬) |
-| **Ollama (문서)** | gemma3:4b | 문서 작성, 에러 분석 | 무료 (로컬) |
+| **Ollama (분석)** | gemma3:4b | 에러 분석 (실패 시에만 호출) | 무료 (로컬) |
 
 ---
 
@@ -143,11 +146,12 @@ Docker 샌드박스 실행
 
 ## 🖥️ Reflex 대시보드
 
-사이드바 기반 5탭 구조의 대시보드를 제공합니다. Reflex 백그라운드 이벤트로 LangGraph 스트림을 받아 단계별 결과를 실시간 갱신합니다.
+사이드바 기반 6탭 구조의 대시보드를 제공합니다. Reflex 백그라운드 이벤트로 LangGraph 스트림을 받아 단계별 결과를 실시간 갱신합니다.
 
 | 탭 | 기능 |
 |---|---|
-| 🚀 실행 | 키워드/목적 입력, 첨부 형식 선택, 파이프라인 단계별 실시간 표시, **HITL 코드 편집** (한국어 주석 `# [설명] ` 마커로 식별 용이), PDF/Word/Markdown 다운로드 |
+| 🚀 실행 | 키워드/목적 입력, 첨부 형식 선택, 파이프라인 단계별 실시간 표시, **HITL 코드 편집** (한국어 주석 `# [설명] ` 마커로 식별 용이), PDF/Word/Markdown 다운로드, **상단에 프로젝트 선택 배너** (선택 시 "N번째 세션 · 마지막: …" 표시 + 이전 코드/리서치 자동 컨텍스트 주입) |
+| 📂 프로젝트 | 프로젝트 생성·삭제, 상태 토글(진행중/완료/중단), 세션 수·마지막 실행 시간, 이어서 작업 / 세션 보기. 상세 페이지에서 세션별 결과/리서치/코드/실행/에러 5탭으로 펼쳐서 확인 |
 | 📊 모니터링 | 에이전트 협업 흐름, 단계별 입출력 내용 확인 |
 | 📝 로그 | LLM 호출 내역, 토큰 사용량 실시간 갱신 |
 | 🕒 히스토리 | 모든 실행 기록 자동 저장 + **PDF / Word / Markdown 재다운로드**, 성공/실패 뱃지, 전체 삭제 |
@@ -226,28 +230,29 @@ aria/
 │   ├── sandbox/
 │   │   ├── executor.py
 │   │   └── error_parser.py
-│   ├── utils/
-│   │   ├── logger.py
-│   │   ├── history.py              ← 실행 히스토리 저장/조회
-│   │   └── scheduler.py            ← APScheduler 백그라운드 + 스케줄 DB
-│   └── ui/
-│       └── dashboard.py             ← (legacy Streamlit 대시보드, 참고용)
-├── aria_app/                        ← Reflex 프런트엔드 (현 메인 UI)
+│   └── utils/
+│       ├── logger.py
+│       ├── history.py              ← 실행 히스토리 저장/조회
+│       ├── scheduler.py            ← APScheduler 백그라운드 + 스케줄 DB
+│       └── project_manager.py      ← 멀티스텝 프로젝트/세션 CRUD + 컨텍스트 조회
+├── aria_app/                        ← Reflex 프런트엔드 (메인 UI)
 │   ├── rxconfig.py
 │   ├── requirements.txt
 │   └── aria_app/
 │       ├── aria_app.py              · 라우트 등록
-│       ├── state.py                 · AriaState (phase1/phase2 스트림 + LLM 로그 미러링)
+│       ├── state.py                 · AriaState (phase1/phase2 스트림 + LLM 로그 + 프로젝트 컨텍스트)
 │       ├── theme.py
 │       ├── components/
 │       │   ├── layout.py
-│       │   └── sidebar.py
+│       │   └── sidebar.py           · 📂 프로젝트 네비 포함
 │       └── pages/
-│           ├── run.py               · 실행 + HITL 코드 편집
+│           ├── run.py               · 실행 + HITL 코드 편집 + 프로젝트 선택 배너
 │           ├── monitor.py
 │           ├── log_page.py
 │           ├── history_detail.py
-│           └── schedule_page.py
+│           ├── schedule_page.py
+│           ├── project_page.py      · 프로젝트 생성 / 목록
+│           └── project_detail.py    · 세션 타임라인 (탭별 결과/리서치/코드/실행/에러)
 ├── config/
 │   ├── agents.yaml
 │   ├── models.yaml
@@ -255,7 +260,8 @@ aria/
 ├── data/                            ← 영속 SQLite (자동 생성)
 │   ├── checkpoints.db              · LangGraph SqliteSaver
 │   ├── history.db                  · 실행 히스토리
-│   └── schedule.db                 · 등록된 스케줄
+│   ├── schedule.db                 · 등록된 스케줄
+│   └── projects.db                 · 멀티스텝 프로젝트/세션 (projects, sessions 테이블)
 └── tests/
 ```
 
@@ -335,8 +341,8 @@ http://localhost:8000      # Reflex 백엔드 (FastAPI)
 | 이메일 파일 첨부 (네이버 SMTP) | ✅ 완료 |
 | 실행 히스토리 저장 / 조회 | ✅ 완료 |
 | 스케줄링 자동 실행 (APScheduler) | ✅ 완료 |
+| 멀티스텝 프로젝트 관리 (SQLite + 컨텍스트 자동 전파) | ✅ 완료 |
 | Neo4j 기반 장기 기억 | 🚧 개발 예정 |
-| 멀티스텝 프로젝트 관리 | 🚧 개발 예정 |
 
 ---
 

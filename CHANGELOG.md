@@ -4,6 +4,61 @@
 
 ---
 
+## [v1.3.1] Output Agent LLM 제거 — 템플릿 조립으로 전환
+
+### 배경
+`Output Agent`는 마지막 단계에서 gemma3:4b로 "최종 결과 문서"를 한 번 더 다듬고 있었음. 하지만:
+- `research_agent`가 이미 GPT-5.4-mini로 환각 억제 + 출처 강제 규칙 아래 `## 핵심 요약 / ## 주요 내용 / ## 참고 출처` 구조로 정리한 결과를, 더 작은 gemma3:4b가 다시 풀어쓰는 구조 — 사실 변형 / 출처 누락 위험만 늘어남
+- 코드 케이스에선 코드·실행 결과가 이미 별도 필드로 노출되는데, gemma가 자연어로 "이 코드는 …를 합니다"를 다시 만들어 UI에 중복 표시
+- gemma3:4b 호출이 보통 가장 느린 마지막 노드라 체감 완료 시간을 압박
+
+### 결정 — `run_output()`을 순수 템플릿 조립으로 전환 (LLM 호출 0회)
+- **리서치 전용 케이스**: `research_result`를 그대로 반환 (GPT가 만든 구조를 그대로 살림)
+- **코드 케이스**: `# 실행 결과` 섹션(✅/❌ 뱃지 + 시간/줄수 메타 + output/error 코드블록) + 실패 시 `## 에러 분석` + `# 참고 리서치` 섹션으로 마크다운 조립. 코드 본문은 `code_result` 별도 필드로 PDF/UI에서 이미 표시되므로 `final_output`에는 미포함
+
+### UI 정리
+- run 페이지 최종 화면에서 "🔍 리서치 결과" 별도 아코디언 제거 — 리서치는 `final_output` 안의 `# 참고 리서치` 섹션으로 이미 노출되므로 중복
+
+### 효과
+- 마지막 노드의 gemma3:4b 호출 1회(보통 2~5초) 제거 → 완료 체감 속도 향상
+- 출처 인용/숫자/이름 변형 위험 제거
+- 두 가지 폴리시 레벨(GPT 정리 위에 gemma 재정리)이 섞여 일관성이 깨지던 문제 해소
+
+---
+
+## [v1.3] SQLite 기반 멀티스텝 프로젝트 관리
+
+### 배경
+단일 실행 단위(`history.db`의 row 하나)만으로는 "FastAPI 기본 서버 → JWT 인증 추가 → DB 연결" 같은 누적 작업을 이어가기 어려웠음. LangGraph `SqliteSaver`는 thread 단위 체크포인트라 같은 흐름 안에서의 재개에는 좋지만, 의도적으로 새 세션을 만들면서 이전 결과를 컨텍스트로 가져오는 멀티스텝 워크플로우에는 맞지 않았음.
+
+### 결정 — 프로젝트/세션 2단 모델
+`data/projects.db`에 별도 SQLite 추가 (기존 `history.db` / `checkpoints.db`와 분리)
+
+| 테이블 | 키 | 의미 |
+|---|---|---|
+| `projects` | id, name, description, status(`active`/`completed`/`paused`), created_at, updated_at | 멀티스텝 작업 묶음 단위 |
+| `sessions` | id, project_id, session_number, user_input, research_result, code_result, execution_result(JSON), error_analysis, final_output, success, created_at | 프로젝트 내 N번째 실행의 전체 결과 |
+
+- `session_number`는 프로젝트별 시퀀스(`MAX(session_number)+1`)로 부여 → "3단계 / 마지막: FastAPI 기본 서버 구현" 같은 UI 표현이 자연스럽게 나옴
+- `ON DELETE CASCADE`로 프로젝트 삭제 시 세션 일괄 정리
+
+### 파이프라인 컨텍스트 전파
+- `AgentState`에 `project_id` / `previous_code` / `previous_context` / `session_number` 추가
+- 프로젝트가 선택된 실행에서 `research_agent`는 `previous_context`를 "이전 세션 컨텍스트" 블록으로 프롬프트에 주입, `code_agent`는 `previous_code`를 "이전 세션 코드 — 위 코드를 기반으로 …" 형태로 받아 누적 개발 유도
+- `output_node` 종료 직후 `project_id`가 있으면 `pm.save_session()` 호출 → 성공/실패 무관하게 세션이 영속화됨 (실패해도 다음 세션이 에러 분석을 컨텍스트로 받아 이어갈 수 있도록)
+
+### Reflex UI
+- 사이드바: `📂 프로젝트` 네비 추가 (실행 / 프로젝트 / 모니터링 / 로그 / 스케줄 순)
+- `/project` — 새 프로젝트 생성 폼 + 목록 카드(상태 뱃지, 세션 수, 마지막 실행 시간, 이어서 작업/세션 보기/삭제)
+- `/project/[pid]` — 프로젝트 요약 + 완료/중단 토글 + 세션 타임라인. 각 세션을 아코디언으로 펼치면 결과/리서치/코드/실행/에러 5탭으로 분류
+- 실행 페이지 idle 상단에 선택 배너 추가: 프로젝트 선택 시 "이번이 N번째 세션 · 마지막: …", 미선택 시 "✨ 새 작업으로 실행 (프로젝트 없음)"
+- Reflex 0.9의 `rx.foreach` 중첩 제약을 피하기 위해 프로젝트/세션 목록은 `ProjectView` / `SessionView` 타입드 뷰모델로 평탄화 (히스토리 사이드바의 `HistoryFlatEntry`와 동일 패턴)
+
+### Legacy 정리
+- v1.2에서 "참고용 보존" 처리했던 Streamlit `src/ui/dashboard.py`(1083 LOC) 완전 제거 — Reflex로 전면 이전 완료, 두 갈래 유지 필요 없어짐
+
+---
+
 ## [v1.2] 프런트엔드 Reflex 전환 + 실시간성 강화
 
 ### UI — Streamlit → Reflex 이관
@@ -16,7 +71,7 @@ Streamlit은 단일 페이지 rerun 모델이라 LangGraph 스트림과 결합 �
 - Reflex 0.9 호환: `rx.Base` 폐기 대응을 위해 import fallback 체인 추가, `rx.foreach` 중첩 제약을 피해 사이드바 히스토리를 평탄화(`HistoryFlatEntry`)
 - 컨테이너 진입점을 `reflex run`으로 교체, 마운트 볼륨 환경에서 worker churn 방지를 위해 `REFLEX_HOT_RELOAD=0`/`REFLEX_USE_GRANIAN=0`
 - 포트: `3000` (프런트) / `8000` (백엔드)
-- Legacy Streamlit 대시보드(`src/ui/dashboard.py`)는 참고용으로 보존
+- Legacy Streamlit 대시보드(`src/ui/dashboard.py`)는 참고용으로 일시 보존 → v1.3에서 삭제
 
 ---
 

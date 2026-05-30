@@ -659,20 +659,8 @@ def _final_view() -> rx.Component:
             ),
             rx.fragment(),
         ),
-        rx.cond(
-            AriaState.final_research_text != "",
-            rx.accordion.root(
-                rx.accordion.item(
-                    header="🔍  리서치 결과",
-                    content=rx.markdown(AriaState.final_research_text),
-                    value="research",
-                ),
-                type="multiple",
-                variant="ghost",
-                width="100%",
-            ),
-            rx.fragment(),
-        ),
+        # 리서치 결과는 final_output 안에 "# 참고 리서치" 섹션으로 포함되므로
+        # 별도 아코디언으로 또 보여주지 않는다 (v1.3.1, Output Agent 템플릿화).
         rx.cond(
             AriaState.final_output_text != "",
             rx.vstack(
