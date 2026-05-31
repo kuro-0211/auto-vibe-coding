@@ -25,7 +25,7 @@ flowchart LR
 
         subgraph HITL["④ Human-in-the-Loop"]
             direction LR
-            EDITOR["✏️ 사용자 코드 편집\n(Streamlit text_area)"]:::user
+            EDITOR["✏️ 사용자 코드 편집\n(Reflex 편집창)"]:::user
             APPLY["human_review_node\nedited_code → code_result"]:::hitl
             EDITOR --> APPLY
         end
@@ -48,9 +48,9 @@ flowchart LR
             ERR --> GEMMA_E --> OLLAMA_F --> LIMIT
         end
 
-        subgraph OA["⑥ Output Agent"]
+        subgraph OA["⑥ Output Agent (v1.3.1)"]
             direction LR
-            GEMMA_O["🦙 gemma3:4b\n결과 문서 정리\n(Markdown)"]:::ollama
+            TMPL_O["📋 템플릿 조립\n(LLM 호출 없음)\nMarkdown"]:::tool
         end
 
         subgraph EXPORT["⑦ 파일 변환"]

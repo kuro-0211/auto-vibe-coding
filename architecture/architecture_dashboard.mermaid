@@ -1,27 +1,34 @@
 flowchart LR
-    subgraph DASH["🖥️ Streamlit 대시보드 (localhost:8501)"]
+    subgraph DASH["🖥️ Reflex 대시보드 (localhost:3000)"]
         direction TB
 
-        subgraph T1["🚀 실행 탭"]
+        subgraph T1["🚀 실행 / 새 대화"]
             direction TB
-            IN["키워드/목적 입력\n📧 이메일 발송 체크\n📎 첨부 형식 선택\n  (pdf / docx / md / none)"]:::input
-            STEPS["파이프라인 단계 표시\n────────────────\n🔍 Research\n💡 Code Decision\n🦙 Code Generation\n🔍 Code Review\n✏️ 사용자 편집 (HITL)\n🐳 Docker 실행\n⚠️ 에러 분석\n📄 결과 정리\n📧 이메일 발송"]:::steps
-            HITL["✏️ 코드 편집 텍스트 에어리어\n────────────────\n[승인 — 실행]\n[원본 복원]\n[거절 — 처음부터]"]:::hitl
+            IN["키워드/목적 입력\n📂 프로젝트 선택 (선택)\n📧 이메일 발송 체크\n📎 첨부 형식 선택\n  (pdf / docx / md / none)"]:::input
+            STEPS["파이프라인 단계 표시\n────────────────\n🔍 Research\n💡 Code Decision\n🦙 Code Generation\n🔍 Code Review\n✏️ 사용자 편집 (HITL)\n🐳 Docker 실행\n⚠️ 에러 분석\n📋 결과 조립 (템플릿)\n📧 이메일 발송"]:::steps
+            HITL["✏️ 코드 편집창 (Reflex)\n────────────────\n[승인 — 실행]\n[원본 복원]\n[거절 — 처음부터]"]:::hitl
             RESULT["📄 결과 출력\n────────────────\n[PDF 다운로드]\n[Word 다운로드]\n[Markdown 다운로드]"]:::result
             IN --> STEPS --> HITL --> RESULT
         end
 
+        T_PROJ["📂 프로젝트 탭\n────────────────\nSQLite 멀티스텝\n이전 세션 자동 컨텍스트\n(이어서 작업)"]:::app
         T2["📊 모니터링 탭\n────────────────\n에이전트 단계별\n입출력 흐름\n로그 카드 표시"]:::app
         T3["📝 로그 탭\n────────────────\nLLM 호출 내역\n프롬프트 / 응답\n토큰 사용량"]:::app
+        T_SCH["⏰ 스케줄 탭\n────────────────\n반복 실행 예약\n(cron 패턴)"]:::app
+        T_HIST["🕒 히스토리\n────────────────\n사이드바 검색\n실행 기록"]:::app
     end
 
-    SESSION["💾 세션 상태\n────────────────\nsession_id (UUID)\nphase (idle/p1/done/p2)\nstep_status\nagent_logs"]:::state
+    SESSION["💾 Reflex State\n────────────────\nphase (idle/p1/p2/done)\nproject_id\nstep_status\nagent_logs"]:::state
+
+    PROJ_DB["📂 projects.db\n────────────────\nprojects + sessions\n(멀티스텝 컨텍스트)"]:::store
 
     CKPT["🗄️ SQLite Checkpointer\ndata/checkpoints.db\n(LangGraph 상태 영속화)"]:::store
 
-    T1 -. "session_state" .-> SESSION
+    T1 -. "Reflex State" .-> SESSION
     T1 -. "실행 결과 공유" .-> T2
     T1 -. "실행 결과 공유" .-> T3
+    T_PROJ -. "이전 세션 로드" .-> PROJ_DB
+    T1 -. "세션 자동 저장" .-> PROJ_DB
     SESSION -. "thread_id" .-> CKPT
 
     classDef app    fill:#f8fafc,stroke:#94a3b8,color:#1e293b

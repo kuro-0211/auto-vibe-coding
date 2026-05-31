@@ -3,16 +3,20 @@ flowchart LR
 
     O_CODER["🦙 Ollama qwen2.5-coder\n(RTX 3080 · 로컬)\n───────────────\n· 코드 생성\n  (run_code_generation)\n· 코드 리뷰\n  (run_code_review)\n· 에러 수정\n  (run_error_analysis)"]:::ollama
 
-    O_GEMMA["🦙 Ollama gemma3:4b\n(RTX 3080 · 로컬)\n───────────────\n· 에러 원인 분석\n  (run_error_analysis)\n· 최종 결과 문서화\n  (run_output)"]:::ollama
+    O_GEMMA["🦙 Ollama gemma3:4b\n(RTX 3080 · 로컬)\n───────────────\n· 에러 원인 분석 전담\n  (run_error_analysis)\n· v1.3.1: Output에서 제거"]:::ollama
 
-    USER["✏️ 사용자 (HITL)\n───────────────\n코드 리뷰 후\n직접 수정 가능\n(text_area)"]:::user
+    USER["✏️ 사용자 (HITL)\n───────────────\n코드 리뷰 후\n직접 수정 가능\n(Reflex 편집창)"]:::user
+
+    TMPL["📋 Output 템플릿 조립\n(LLM 호출 없음)\nv1.3.1"]:::tool
 
     P -- "리서치 컨텍스트 전달" --> O_CODER
     O_CODER -- "코드 결과" --> USER
     USER -- "edited_code" --> O_CODER
     O_GEMMA -- "에러 분석 결과" --> O_CODER
-    O_CODER -- "최종 코드 + 실행 결과" --> O_GEMMA
+    O_CODER -- "최종 코드 + 실행 결과" --> TMPL
+    P -- "리서치 결과" --> TMPL
 
     classDef gpt    fill:#dcfce7,stroke:#86efac,color:#14532d
     classDef ollama fill:#fee2e2,stroke:#fca5a5,color:#7f1d1d
     classDef user   fill:#fce7f3,stroke:#f9a8d4,color:#831843,font-weight:bold
+    classDef tool   fill:#fef9c3,stroke:#fde047,color:#713f12

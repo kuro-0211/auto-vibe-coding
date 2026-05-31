@@ -1,7 +1,7 @@
 flowchart LR
     subgraph HOST["WSL2 호스트 (Ubuntu 24.04)"]
         direction TB
-        APP["🐍 ARIA 앱 컨테이너\nauto-vibe-coding_app_1\n(Streamlit + LangGraph)"]:::app
+        APP["🐍 ARIA 앱 컨테이너\nauto-vibe-coding-app-1\n(Reflex + LangGraph)"]:::app
         EXECUTOR["sandbox/executor.py\n────────────────\nclean_code() — 코드 블록 제거\nexecute_code() — Docker SDK 호출"]:::tool
         SOCK["/var/run/docker.sock\n(host mount)"]:::tool
         APP --> EXECUTOR --> SOCK
