@@ -133,3 +133,16 @@
 ### [RESOLVED-021] Output Agent의 LLM 재가공이 사실 변형/출처 누락 위험
 - **증상:** `research_agent`(GPT-5.4-mini)가 환각 억제 + 출처 강제 규칙 아래 `## 핵심 요약 / ## 주요 내용 / ## 참고 출처`로 정리한 결과를, `output_agent`(gemma3:4b)가 마지막에 또 한 번 자연어로 풀어쓰는 구조였음. 두 가지 폴리시 레벨이 섞여 인용이 빠지거나 숫자가 미세하게 비틀리는 경우 발생. 코드 케이스에선 코드·실행 결과까지 풀어쓰면서 UI에 같은 내용이 중복 표시
 - **해결:** v1.3.1에서 `run_output()`을 LLM 없는 순수 템플릿 조립으로 전환. 리서치 케이스는 `research_result` 그대로 반환, 코드 케이스는 `# 실행 결과` + 실패 시 `## 에러 분석` + `# 참고 리서치` 섹션 마크다운 조립. UI에서 중복되던 "🔍 리서치 결과" 아코디언도 제거. 부수 효과로 마지막 노드의 gemma3:4b 호출 1회 제거되어 완료 체감 속도 향상
+
+### [RESOLVED-022] 스케줄러 자동 실행이 사이드바 히스토리에 섞여 표시
+- **증상:** APScheduler가 새벽에 자동 실행한 결과가 사용자 수동 실행과 함께 사이드바 "히스토리"에 무차별 쌓여 즉시 식별 어려움. 스케줄 페이지에서도 등록된 스케줄의 누적 결과를 볼 방법이 없었음(`last_run` / `last_status`만 노출)
+- **원인:** `graph.output_node` → `save_run_from_state()`가 수동/자동 구분 없이 단일 `history` 테이블에 적재, `AgentState`에 출처를 표시하는 필드가 없었음
+- **해결:** v1.4에서 `history.schedule_id` 컬럼 추가(기존 DB는 ALTER로 자동 마이그레이션). `AgentState.schedule_id` 신설 후 scheduler만 실제 sid 주입, 수동 경로는 None. `list_history`는 수동만, 신설 `list_schedule_runs`는 자동만 반환. `clear_history`도 수동만 삭제. `/schedule` 페이지 하단에 "📜 최근 스케줄 실행" 섹션을 두어 카드별 "결과 보기"로 `/history/{id}` 상세(결과/리서치/코드/실행/에러)에 도달
+
+### [RESOLVED-023] 사이드바에 현재 시간(KST) 표시 부재
+- **증상:** 영상 촬영·시연 중 시간 확인을 시스템 트레이로 빠져나가야 했고, 스케줄러의 다음 트리거가 임박했는지 사이드바 안에서 직관적으로 가늠하기 어려웠음
+- **해결:** v1.4에서 사이드바 세션 ID 박스 아래에 `rx.moment` 컴포넌트(`interval=1000`, `tz="Asia/Seoul"`, 포맷 `YYYY-MM-DD HH:mm:ss`)로 1초 단위 자동 갱신 시계 추가. `moment` / `moment-timezone` / `react-moment` 패키지가 프런트엔드에 새로 잡혀 첫 도입 시 브라우저 하드 리프레시 1회 필요
+
+### [RESOLVED-024] 아키텍처 mermaid 다이어그램이 코드 변경(v1.2 Reflex 전환·v1.3.1 Output LLM 제거)과 어긋남
+- **증상:** `architecture/*.mermaid` 4종이 Streamlit / gemma3:4b 출력 LLM / 대시보드 3탭 표기를 그대로 유지 — 발표·포트폴리오 영상 자료의 사실 일관성에 위험
+- **해결:** v1.4에서 4개 mermaid를 현재 코드 기준으로 갱신(`Streamlit → Reflex`, Output gemma3:4b → 템플릿 조립, dashboard 3탭 → 6탭 + `projects.db` 노드, sandbox 컨테이너 라벨 정리). `mmdc`로 SVG 4개 재생성, 한글/이모지 렌더 확인

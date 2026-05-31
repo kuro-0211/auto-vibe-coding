@@ -4,6 +4,55 @@
 
 ---
 
+## [v1.4] 스케줄러 실행 분리 + 사이드바 시계 + 아키텍처 다이어그램 동기화
+
+### 1. 스케줄러 자동 실행을 사이드바 히스토리에서 분리
+
+**배경:**
+기존엔 `graph.output_node` → `save_run_from_state()`가 수동/자동 실행 구분 없이 `history.db`에 한꺼번에 적재. 사이드바 "히스토리"에 사용자가 직접 돌린 결과와 스케줄러가 새벽에 돌린 결과가 섞여 나와, 어느 게 자기 실행이고 어느 게 자동 실행인지 즉시 식별하기 어려웠음. 스케줄 페이지에서도 "이 스케줄이 지금까지 어떤 결과를 냈지?"를 볼 방법이 없었음 — `last_run` / `last_status`만 표시됐음.
+
+**결정 — 데이터 모델 분리:**
+- `history` 테이블에 `schedule_id INTEGER` 컬럼 추가. 기존 DB는 `init_db()` 진입 시 `PRAGMA table_info` 검사 후 `ALTER TABLE ADD COLUMN`으로 자동 마이그레이션 (기존 행은 NULL = 수동 실행으로 자연 흡수)
+- `AgentState`에 `schedule_id: Optional[int]` 추가 → `save_run_from_state()`가 함께 저장
+- **수동 실행 경로**(CLI `main.py`, Reflex `_stream_phase1`)는 명시적으로 `schedule_id=None`, **자동 실행 경로**(`scheduler.run_scheduled`)는 자기 sid를 주입
+
+**결정 — 조회 분리:**
+- `list_history(limit)` → `WHERE schedule_id IS NULL`만 반환 → 사이드바 히스토리에서 자동 실행이 사라짐
+- `list_schedule_runs(limit, schedule_id=None)` 신설 → `WHERE schedule_id IS NOT NULL`만 반환 (특정 스케줄로 좁힐 수도 있음)
+- `clear_history()`도 `schedule_id IS NULL`로 좁혀 "히스토리 전체 삭제" 버튼이 자동 실행 기록까지 함께 날리지 않도록 보호
+
+**Reflex UI:**
+- `/schedule` 페이지 하단에 **"📜 최근 스케줄 실행"** 섹션 추가
+- 카드별: `스케줄 #N` 배지, 실행 시각(KST), 입력 프리뷰, 성공/실패 뱃지, 소요 시간, 재시도 횟수, "결과 보기" 버튼 → `/history/{id}` (기존 상세 페이지를 그대로 재사용 — 결과/리서치/코드/실행/에러 5탭 다 확인 가능)
+- 비어 있을 때 가이드 안내 ("스케줄이 등록되면 다음 실행 시 여기에 결과가 쌓입니다.")
+- `ScheduleRunView` typed view model + `schedule_runs_view` computed var. Reflex 0.9 `rx.foreach` 중첩 제약을 피하기 위해 기존 `HistoryFlatEntry` / `ProjectView` / `SessionView`와 동일 패턴
+- `_refresh_schedule()`이 내부에서 `_refresh_schedule_runs()`를 함께 호출 → 등록/토글/삭제/마운트 시 함께 갱신
+
+### 2. 사이드바 하단 현재 시간 (KST) 실시간 표시
+
+**배경:**
+영상 촬영·발표·시연 중 "지금 몇 시지?"를 확인하려고 시스템 트레이를 보지 않아도 되도록, 그리고 스케줄러가 다음 실행을 언제 트리거할지 사이드바 안에서 직관적으로 가늠하도록 좌측 사이드바 하단에 시계를 노출.
+
+**결정:**
+- `rx.moment` 컴포넌트 사용 (`interval=1000`으로 1초마다 자동 갱신, `tz="Asia/Seoul"` 고정, 포맷 `YYYY-MM-DD HH:mm:ss`)
+- 위치: 세션 ID 박스 바로 아래 ("현재 시간 (KST)" 라벨 + monospace 값)
+- 부수 효과: `moment` / `moment-timezone` / `react-moment` 프런트엔드 패키지가 새로 잡힘 → 첫 도입 시 브라우저 하드 리프레시 필요
+
+### 3. 아키텍처 mermaid 다이어그램을 코드 기준으로 동기화 + SVG 재생성
+
+**배경:**
+영상 발표 자료(`VIDEO_PLAN.md`) 작성 중 `architecture/*.mermaid` 4종이 v1.2(Reflex 전환)·v1.3(멀티스텝)·v1.3.1(Output Agent LLM 제거) 변경을 반영하지 못한 채 Streamlit/gemma3:4b 표기로 남아 있어 평가자 혼란 위험.
+
+**갱신:**
+- `architecture.mermaid` — HITL `Streamlit text_area` → `Reflex 편집창`, Output Agent를 gemma3:4b 노드 대신 "📋 템플릿 조립 (LLM 호출 없음) v1.3.1"로 표기
+- `architecture_ai.mermaid` — gemma3:4b 역할에서 "최종 결과 문서화" 제거 + `O_CODER → O_GEMMA` 화살표 정리, "📋 Output 템플릿 조립" 노드 신설로 GPT 리서치/qwen 코드가 직접 합류
+- `architecture_dashboard.mermaid` — 제목 `Streamlit 대시보드 (localhost:8501)` → `Reflex 대시보드 (localhost:3000)`, 3탭(실행/모니터링/로그) → 6탭(+ 📂 프로젝트 · ⏰ 스케줄 · 🕒 히스토리), `projects.db` 노드 추가, HITL "Streamlit text_area" → "Reflex 편집창", State 라벨도 Reflex State로
+- `architecture_sandbox.mermaid` — 앱 컨테이너 라벨 `(Streamlit + LangGraph)` → `(Reflex + LangGraph)`, 컨테이너 명도 compose v2 표기로
+
+`mmdc`(`@mermaid-js/mermaid-cli`)로 4개 SVG 재생성, 한글 텍스트/이모지 모두 정상 렌더 확인.
+
+---
+
 ## [v1.3.1] Output Agent LLM 제거 — 템플릿 조립으로 전환
 
 ### 배경
