@@ -39,6 +39,8 @@ def main():
         "previous_code": None,
         "previous_context": None,
         "session_number": 1,
+        # 스케줄러 실행이 아니므로 None
+        "schedule_id": None,
     }
 
     print("\n⚙️  파이프라인 실행 중...\n")

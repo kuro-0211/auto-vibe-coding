@@ -186,6 +186,13 @@ def run_scheduled(schedule_id: int) -> None:
             "human_approved": True,
             "edited_code": None,
             "start_time": start,
+            # 멀티스텝 프로젝트는 스케줄러에서 미사용
+            "project_id": None,
+            "previous_code": None,
+            "previous_context": None,
+            "session_number": 1,
+            # 스케줄러 자동 실행 — 히스토리에서 분리
+            "schedule_id": schedule_id,
         }
         ts = int(start)
         cfg1 = {"configurable": {"thread_id": f"sched-{schedule_id}-{ts}-p1"}}

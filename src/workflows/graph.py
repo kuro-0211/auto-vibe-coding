@@ -33,6 +33,8 @@ class AgentState(TypedDict):
     previous_code: Optional[str]
     previous_context: Optional[str]
     session_number: int
+    # ── 스케줄러 자동 실행 표시 (수동 실행과 분리해 저장) ─
+    schedule_id: Optional[int]
 
 # ── 노드 함수 ──────────────────────────────────────────────
 def research_node(state: AgentState) -> AgentState:

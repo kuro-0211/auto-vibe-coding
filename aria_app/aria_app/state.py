@@ -39,6 +39,7 @@ from utils.history import (
     clear_history,
     get_history,
     list_history,
+    list_schedule_runs,
 )
 from utils.logger import pipeline_logger
 from workflows.graph import build_phase1_graph, build_phase2_graph
@@ -118,6 +119,18 @@ class ScheduleRowView(_RxBase):
     preview: str = ""
     email_format: str = "-"
     send_email: bool = False
+
+
+class ScheduleRunView(_RxBase):
+    """스케줄러 자동 실행 1건의 표시용 모델."""
+
+    history_id: int = 0
+    schedule_id: int = 0
+    created_at: str = ""
+    preview: str = ""
+    success: bool = False
+    elapsed: int = 0
+    retry: int = 0
 
 
 class LlmLogView(_RxBase):
@@ -225,6 +238,7 @@ class AriaState(rx.State):
 
     # ── schedule list + form ──────────────────────────────
     schedule_items: list[dict] = []
+    schedule_runs_data: list[dict] = []
     scheduler_running: bool = False
 
     s_input: str = ""
@@ -478,6 +492,29 @@ class AriaState(rx.State):
         return "🟢 동작" if self.scheduler_running else "🔴 정지"
 
     @rx.var
+    def schedule_runs_view(self) -> list[ScheduleRunView]:
+        out: list[ScheduleRunView] = []
+        for r in self.schedule_runs_data:
+            preview = (r.get("user_input") or "").strip()
+            preview = preview[:60] + ("…" if len(preview) > 60 else "")
+            out.append(
+                ScheduleRunView(
+                    history_id=int(r.get("id") or 0),
+                    schedule_id=int(r.get("schedule_id") or 0),
+                    created_at=(r.get("created_at") or "").replace("T", " "),
+                    preview=preview or "(빈 입력)",
+                    success=bool(r.get("success")),
+                    elapsed=int(r.get("elapsed_sec") or 0),
+                    retry=int(r.get("retry_count") or 0),
+                )
+            )
+        return out
+
+    @rx.var
+    def has_schedule_runs(self) -> bool:
+        return len(self.schedule_runs_data) > 0
+
+    @rx.var
     def pipeline_steps(self) -> list[PipelineStepView]:
         return [
             PipelineStepView(key=key, label=label, status=self.step_status.get(key, "idle"))
@@ -727,6 +764,13 @@ class AriaState(rx.State):
         except Exception:
             self.schedule_items = []
             self.scheduler_running = False
+        self._refresh_schedule_runs()
+
+    def _refresh_schedule_runs(self):
+        try:
+            self.schedule_runs_data = [dict(x) for x in list_schedule_runs(limit=50)]
+        except Exception:
+            self.schedule_runs_data = []
 
     def _refresh_projects(self):
         try:
@@ -959,6 +1003,8 @@ class AriaState(rx.State):
             "previous_code": prev_code,
             "previous_context": prev_context,
             "session_number": session_number,
+            # 수동 실행 — 사이드바 히스토리에 노출
+            "schedule_id": None,
         }
         config = {"configurable": {"thread_id": session_id}}
 

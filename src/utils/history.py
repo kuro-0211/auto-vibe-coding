@@ -20,7 +20,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """history 테이블이 없으면 생성."""
+    """history 테이블이 없으면 생성. schedule_id 컬럼이 없으면 추가."""
     with _connect() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS history (
@@ -35,9 +35,13 @@ def init_db() -> None:
                 execution_result TEXT,
                 error_analysis  TEXT,
                 final_output    TEXT,
-                retry_count     INTEGER DEFAULT 0
+                retry_count     INTEGER DEFAULT 0,
+                schedule_id     INTEGER
             )
         """)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(history)").fetchall()}
+        if "schedule_id" not in cols:
+            conn.execute("ALTER TABLE history ADD COLUMN schedule_id INTEGER")
         conn.commit()
 
 
@@ -52,8 +56,13 @@ def save_run(
     final_output: Optional[str] = None,
     retry_count: int = 0,
     session_id: Optional[str] = None,
+    schedule_id: Optional[int] = None,
 ) -> int:
-    """단일 실행 결과를 저장하고 row id 반환."""
+    """단일 실행 결과를 저장하고 row id 반환.
+
+    schedule_id가 None이면 수동 실행(사이드바 히스토리에 노출), 값이 있으면
+    스케줄러 자동 실행(스케줄 페이지의 "최근 실행" 섹션에만 노출).
+    """
     init_db()
     created_at = datetime.now().isoformat(timespec="seconds")
     exec_json = json.dumps(execution_result, ensure_ascii=False) if execution_result else None
@@ -63,8 +72,8 @@ def save_run(
             """INSERT INTO history
                (session_id, created_at, user_input, success, elapsed_sec,
                 research_result, code_result, execution_result,
-                error_analysis, final_output, retry_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                error_analysis, final_output, retry_count, schedule_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 session_id,
                 created_at,
@@ -77,6 +86,7 @@ def save_run(
                 error_analysis,
                 final_output,
                 retry_count,
+                schedule_id,
             ),
         )
         conn.commit()
@@ -84,17 +94,45 @@ def save_run(
 
 
 def list_history(limit: int = 100) -> list[dict]:
-    """최신순으로 히스토리 조회. 상세 필드는 미포함(목록용)."""
+    """수동 실행(schedule_id IS NULL)만 최신순으로 조회. 사이드바 히스토리용."""
     init_db()
     with _connect() as conn:
         rows = conn.execute(
             """SELECT id, session_id, created_at, user_input, success,
                       elapsed_sec, retry_count
                FROM history
+               WHERE schedule_id IS NULL
                ORDER BY id DESC
                LIMIT ?""",
             (limit,),
         ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_schedule_runs(limit: int = 50, schedule_id: Optional[int] = None) -> list[dict]:
+    """스케줄러 자동 실행만 최신순으로 조회. schedule_id 지정 시 해당 스케줄만."""
+    init_db()
+    with _connect() as conn:
+        if schedule_id is None:
+            rows = conn.execute(
+                """SELECT id, schedule_id, created_at, user_input, success,
+                          elapsed_sec, retry_count
+                   FROM history
+                   WHERE schedule_id IS NOT NULL
+                   ORDER BY id DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT id, schedule_id, created_at, user_input, success,
+                          elapsed_sec, retry_count
+                   FROM history
+                   WHERE schedule_id = ?
+                   ORDER BY id DESC
+                   LIMIT ?""",
+                (schedule_id, limit),
+            ).fetchall()
         return [dict(r) for r in rows]
 
 
@@ -117,10 +155,14 @@ def get_history(history_id: int) -> Optional[dict]:
 
 
 def clear_history() -> int:
-    """전체 삭제. 삭제된 row 수 반환."""
+    """수동 실행만 삭제(사이드바 히스토리 대상). 스케줄러 자동 실행은 보존.
+
+    Why: '히스토리 전체 삭제' 버튼은 사이드바 히스토리 정리용이므로 스케줄
+    페이지에서 따로 관리되는 자동 실행 기록까지 지우면 곤란하다.
+    """
     init_db()
     with _connect() as conn:
-        cur = conn.execute("DELETE FROM history")
+        cur = conn.execute("DELETE FROM history WHERE schedule_id IS NULL")
         conn.commit()
         return cur.rowcount
 
@@ -133,6 +175,7 @@ def save_run_from_state(state: dict, elapsed_sec: Optional[int] = None) -> int:
     else:
         success = bool(state.get("final_output"))
 
+    sid = state.get("schedule_id")
     return save_run(
         user_input=state.get("user_input", ""),
         success=success,
@@ -143,4 +186,5 @@ def save_run_from_state(state: dict, elapsed_sec: Optional[int] = None) -> int:
         error_analysis=state.get("error_analysis"),
         final_output=state.get("final_output"),
         retry_count=state.get("retry_count", 0) or 0,
+        schedule_id=int(sid) if sid else None,
     )

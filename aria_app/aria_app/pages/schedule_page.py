@@ -10,6 +10,7 @@ from ..theme import (
     ACCENT,
     BORDER,
     CARD_BG,
+    FAIL,
     HINT,
     SUB,
     SUCCESS,
@@ -297,6 +298,80 @@ def _schedule_card(s: rx.Var) -> rx.Component:
     )
 
 
+def _run_card(r: rx.Var) -> rx.Component:
+    return rx.box(
+        rx.hstack(
+            rx.vstack(
+                rx.hstack(
+                    rx.box(
+                        "스케줄 #" + r.schedule_id.to_string(),
+                        font_size="10px",
+                        font_weight="700",
+                        padding="2px 8px",
+                        border_radius="999px",
+                        background=f"{ACCENT}1f",
+                        color=ACCENT,
+                    ),
+                    rx.text(r.created_at, font_size="11px", color=SUB),
+                    spacing="2",
+                    align="center",
+                ),
+                rx.text(
+                    r.preview,
+                    font_size="13px",
+                    color=TEXT,
+                    no_of_lines=1,
+                ),
+                rx.text(
+                    "⏱ " + r.elapsed.to_string() + "s · 재시도 " + r.retry.to_string() + "회",
+                    font_size="11px",
+                    color=SUB,
+                ),
+                spacing="1",
+                align="start",
+                flex="1",
+            ),
+            rx.spacer(),
+            rx.cond(
+                r.success,
+                rx.box(
+                    "✅ 성공",
+                    font_size="11px",
+                    font_weight="600",
+                    padding="3px 9px",
+                    border_radius="999px",
+                    background=f"{SUCCESS}22",
+                    color=SUCCESS,
+                ),
+                rx.box(
+                    "❌ 실패",
+                    font_size="11px",
+                    font_weight="600",
+                    padding="3px 9px",
+                    border_radius="999px",
+                    background=f"{FAIL}22",
+                    color=FAIL,
+                ),
+            ),
+            rx.button(
+                "결과 보기",
+                on_click=AriaState.open_history(r.history_id),
+                variant="outline",
+                style={"font_size": "11px", "padding": "4px 10px"},
+            ),
+            spacing="3",
+            align="center",
+            width="100%",
+        ),
+        background=CARD_BG,
+        border=f"1px solid {BORDER}",
+        border_radius="12px",
+        padding="12px 14px",
+        margin_bottom="8px",
+        width="100%",
+    )
+
+
 def schedule_page() -> rx.Component:
     body = rx.vstack(
         page_header("스케줄", "자동 실행 (Asia/Seoul)"),
@@ -329,6 +404,35 @@ def schedule_page() -> rx.Component:
                 width="100%",
             ),
             rx.foreach(AriaState.schedule_rows, _schedule_card),
+        ),
+        rx.box(height="1px", background=BORDER, margin="20px 0 12px", width="100%"),
+        _section_label("📜 최근 스케줄 실행"),
+        rx.cond(
+            AriaState.has_schedule_runs,
+            rx.foreach(AriaState.schedule_runs_view, _run_card),
+            rx.box(
+                rx.vstack(
+                    rx.text("⏳", font_size="24px"),
+                    rx.text(
+                        "아직 자동 실행된 기록이 없습니다",
+                        font_size="13px",
+                        color=TEXT,
+                    ),
+                    rx.text(
+                        "스케줄이 등록되면 다음 실행 시 여기에 결과가 쌓입니다.",
+                        font_size="11px",
+                        color=SUB,
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                background=CARD_BG,
+                border=f"1px solid {BORDER}",
+                border_radius="12px",
+                padding="30px 16px",
+                text_align="center",
+                width="100%",
+            ),
         ),
         spacing="0",
         width="100%",
